@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anabela Cocina Casera — Pedidos</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C1442D">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Anabela">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F1E6D2;
+    --paper-light:#FBF6EA;
+    --ink:#2E2A22;
+    --tomate:#C1442D;
+    --oliva:#5B6B45;
+    --yema:#E3A73B;
+    --linea: rgba(46,42,34,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 38px, var(--linea) 38px, var(--linea) 39px),
+      repeating-linear-gradient(90deg, transparent, transparent 38px, var(--linea) 38px, var(--linea) 39px),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Karla', sans-serif;
+    min-height:100vh;
+  }
+
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 18px 120px;}
+
+  header.top{
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center; margin-bottom:34px; position:relative;
+  }
+  .eyebrow{
+    font-family:'Space Mono', monospace; font-size:12px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--oliva); margin-bottom:6px;
+  }
+  h1.brand{
+    font-family:'Fraunces', serif; font-weight:600; font-size:clamp(34px,6vw,54px);
+    margin:0; line-height:1.02; color:var(--ink);
+  }
+  h1.brand em{ color:var(--tomate); font-style:italic; font-weight:500;}
+  .tagline{
+    font-family:'Fraunces', serif; font-style:italic; font-weight:500;
+    color:var(--oliva); font-size:16px; margin-top:8px;
+  }
+
+  .layout{display:grid; grid-template-columns:1fr 340px; gap:28px; align-items:start;}
+  @media (max-width:860px){ .layout{grid-template-columns:1fr;} }
+
+  nav.cats{
+    display:flex; gap:8px; flex-wrap:wrap; margin-bottom:26px;
+  }
+  nav.cats button{
+    font-family:'Space Mono', monospace; font-size:12.5px; letter-spacing:.03em;
+    background:var(--paper-light); border:1px solid var(--linea); color:var(--ink);
+    padding:8px 14px; border-radius:99px; cursor:pointer; text-transform:uppercase;
+  }
+  nav.cats button.active{ background:var(--ink); color:var(--paper-light); border-color:var(--ink);}
+
+  section.categoria{ margin-bottom:38px; }
+  .cat-header{ display:flex; align-items:baseline; gap:12px; margin-bottom:14px; }
+  .cat-header h2{
+    font-family:'Fraunces', serif; font-weight:600; font-size:24px; margin:0;
+  }
+  .cat-header .cnt{ font-family:'Space Mono', monospace; font-size:12px; color:var(--oliva); }
+  .cat-header hr{ flex:1; border:none; border-top:1px dashed var(--linea); }
+
+  .item{
+    background:var(--paper-light); border:1px solid var(--linea); border-radius:10px;
+    padding:16px 18px; margin-bottom:10px; display:flex; justify-content:space-between; gap:16px;
+    align-items:center;
+  }
+  .item-info h3{ font-family:'Fraunces', serif; font-weight:600; font-size:17px; margin:0 0 4px; }
+  .item-info p{ margin:0; font-size:13.5px; color:#5a5648; line-height:1.4; }
+  .item-price{
+    font-family:'Space Mono', monospace; font-weight:700; font-size:15px; color:var(--tomate);
+    white-space:nowrap;
+  }
+  .item-actions{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .stepper{ display:flex; align-items:center; gap:0; border:1px solid var(--linea); border-radius:8px; overflow:hidden; }
+  .stepper button{
+    width:28px; height:28px; border:none; background:var(--paper); font-size:16px; cursor:pointer; color:var(--ink);
+  }
+  .stepper span{ width:26px; text-align:center; font-family:'Space Mono',monospace; font-size:13px; }
+  .add-btn{
+    background:var(--oliva); color:var(--paper-light); border:none; border-radius:8px;
+    padding:8px 14px; font-family:'Space Mono',monospace; font-size:12px; text-transform:uppercase;
+    letter-spacing:.04em; cursor:pointer;
+  }
+  .add-btn:active{ transform:scale(0.97); }
+
+  /* Comanda */
+  .comanda-wrap{ position:sticky; top:20px; }
+  .comanda{
+    background:var(--paper-light);
+    border:1px solid var(--linea);
+    box-shadow:0 10px 24px rgba(46,42,34,0.10);
+    position:relative;
+    padding:22px 20px 20px;
+  }
+  .comanda::before, .comanda::after{
+    content:""; position:absolute; left:0; right:0; height:10px;
+    background-image: radial-gradient(circle at 8px 5px, var(--paper) 5px, transparent 5.5px);
+    background-size:16px 10px; background-repeat:repeat-x;
+  }
+  .comanda::before{ top:-5px; }
+  .comanda::after{ bottom:-5px; transform:rotate(180deg); }
+
+  .comanda h3{
+    font-family:'Fraunces', serif; font-weight:600; font-size:18px; margin:0 0 2px;
+    text-align:center;
+  }
+  .comanda .sub{ text-align:center; font-family:'Space Mono',monospace; font-size:10.5px;
+    color:var(--oliva); text-transform:uppercase; letter-spacing:.12em; margin-bottom:14px; }
+
+  .comanda-empty{ font-size:13.5px; color:#7a7566; text-align:center; padding:20px 0; font-style:italic; }
+
+  .comanda-line{
+    display:flex; justify-content:space-between; gap:8px; font-family:'Space Mono',monospace;
+    font-size:12.5px; padding:6px 0; border-bottom:1px dotted var(--linea);
+  }
+  .comanda-line .nom{ flex:1; }
+  .comanda-line .qty{ color:var(--oliva); }
+  .comanda-line button.rm{
+    background:none; border:none; color:var(--tomate); cursor:pointer; font-size:13px; padding:0 0 0 4px;
+  }
+
+  .comanda-total{
+    display:flex; justify-content:space-between; margin-top:14px; padding-top:12px;
+    border-top:2px solid var(--ink); font-family:'Space Mono',monospace; font-weight:700; font-size:15px;
+  }
+
+  textarea#nota{
+    width:100%; margin-top:12px; border:1px solid var(--linea); border-radius:6px; background:var(--paper);
+    font-family:'Karla',sans-serif; font-size:13px; padding:8px; resize:vertical; min-height:44px;
+  }
+
+  .wsp-btn{
+    display:block; width:100%; text-align:center; text-decoration:none;
+    background:#25D366; color:#0b3d1e; font-weight:700; font-family:'Karla',sans-serif;
+    padding:13px; border-radius:8px; margin-top:14px; font-size:14.5px;
+  }
+  .wsp-btn.disabled{ opacity:.45; pointer-events:none; }
+
+  /* Barra flotante mobile */
+  .mobile-cart-bar{
+    display:none; position:fixed; bottom:16px; left:16px; right:16px;
+    background:var(--oliva); color:var(--paper-light); padding:14px 20px;
+    border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    justify-content:space-between; align-items:center; z-index:99;
+    text-decoration:none; font-family:'Space Mono',monospace; font-weight:700; font-size:14px;
+  }
+  @media (max-width:860px){
+    .mobile-cart-bar.visible{ display:flex; }
+  }
+
+  .pago-box{
+    margin-top:16px; background:var(--paper); border:1px dashed var(--linea); border-radius:8px; padding:12px 14px;
+  }
+  .pago-box .lbl{ font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--oliva); }
+  .pago-row{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
+  .pago-row .val{ font-family:'Space Mono',monospace; font-size:14px; font-weight:700; }
+  .copy-btn{
+    background:var(--ink); color:var(--paper-light); border:none; border-radius:6px; padding:5px 10px;
+    font-size:11px; font-family:'Space Mono',monospace; cursor:pointer;
+  }
+  .copy-btn.ok{ background:var(--oliva); }
+
+  footer.note{
+    text-align:center; font-size:12px; color:#8a8574; margin-top:26px; font-family:'Space Mono',monospace;
+  }
+
+  .admin-link{
+    background:none; border:none; color:#8a8574; font-family:'Space Mono',monospace;
+    font-size:11px; text-decoration:underline; cursor:pointer; margin-top:14px; padding:4px;
+  }
+  .admin-panel{
+    display:none; max-width:420px; margin:14px auto 0; background:var(--paper-light);
+    border:1px solid var(--linea); border-radius:10px; padding:16px 18px; text-align:left;
+  }
+  .admin-panel.open{ display:block; }
+  .admin-panel label{
+    font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--oliva); display:block; margin-bottom:6px;
+  }
+  .admin-panel input[type=text], .admin-panel input[type=password]{
+    width:100%; padding:9px 10px; border:1px solid var(--linea); border-radius:6px;
+    font-family:'Karla',sans-serif; font-size:14px; margin-bottom:10px;
+  }
+  .admin-panel .row{ display:flex; gap:8px; }
+  .admin-panel button.guardar{
+    background:var(--oliva); color:var(--paper-light); border:none; border-radius:6px;
+    padding:9px 16px; font-family:'Space Mono',monospace; font-size:12px; cursor:pointer; flex:1;
+  }
+  .admin-panel button.cancelar{
+    background:none; border:1px solid var(--linea); border-radius:6px; padding:9px 16px;
+    font-family:'Space Mono',monospace; font-size:12px; cursor:pointer;
+  }
+  .admin-panel .estado{ font-size:11px; margin-top:8px; font-family:'Space Mono',monospace; color:var(--oliva); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">Necochea · Pastas / Pizzas / Focaccias / Viandas / Sandwichería</div>
+    <h1 class="brand">Anabela <em>Cocina Casera</em></h1>
+    <div class="tagline">"como en casa, pero te lo llevás"</div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <nav class="cats" id="catsNav"></nav>
+      <div id="menu"></div>
+    </div>
+
+    <div class="comanda-wrap" id="seccionComanda">
+      <div class="comanda">
+        <h3>La Comanda</h3>
+        <div class="sub">tu pedido</div>
+        <div id="comandaBody"><div class="comanda-empty">Todavía no agregaste nada.<br>Elegí algo rico del menú →</div></div>
+        <div class="comanda-total" id="comandaTotal" style="display:none;">
+          <span>TOTAL</span><span id="totalNum">$0</span>
+        </div>
+        <textarea id="nota" placeholder="Aclaraciones (ej: sin sal, para las 20hs, piso 3 depto B...)"></textarea>
+
+        <a href="#" id="wspBtn" class="wsp-btn disabled">Enviar pedido por WhatsApp</a>
+
+        <div class="pago-box">
+          <div class="lbl">Transferencia</div>
+          <div class="pago-row">
+            <span class="val" id="aliasVal">anabela-pastas</span>
+            <button class="copy-btn" onclick="copiarAlias(event)">Copiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a href="#seccionComanda" class="mobile-cart-bar" id="mobileCartBar">
+    <span id="mobileCartCount">0 ítems</span>
+    <span>Ver Pedido (<span id="mobileCartTotal">$0</span>) ↓</span>
+  </a>
+
+  <footer class="note">
+    Recordá enviar el comprobante de transferencia junto con tu pedido por WhatsApp ✓
+    <br>
+    <button class="admin-link" onclick="toggleAdmin()">✎ Cambiar plato del día</button>
+    <div class="admin-panel" id="adminPanel">
+      <label>Clave de acceso</label>
+      <input type="password" id="claveInput" placeholder="Ingresá la clave">
+      <label>Plato del día de hoy</label>
+      <input type="text" id="platoInput" placeholder="Ej: Milanesa napolitana c/omelete de zanahoria">
+      <div class="row">
+        <button class="guardar" onclick="guardarPlato()">Guardar</button>
+        <button class="cancelar" onclick="toggleAdmin()">Cancelar</button>
+      </div>
+      <div class="estado" id="platoEstado"></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+const WHATSAPP_NUMBER = "5492262475144";
+const ALIAS = "anabela-pastas";
+const PLATO_API = "/.netlify/functions/plato"; // la clave real vive en el servidor, no acá
+
+const PLATOS_DEL_DIA = [
+  "Pastel de papas", "Guiso de lentejas", "Pollo con papas y batatas al horno",
+  "Ravioles", "Chuletas de cerdo con puré", "Zapallitos rellenos",
+  "Canelones con bolognesa", "Fajitas de pollo a la portuguesa", "Pastel de bondiola",
+  "Pizza de anchoas con muzzarella", "Milanesa napolitana c/omelete de zanahoria",
+  "Lasagna c/bolognesa", "Tallarines caseros c/crema de champignones",
+  "Suprema a la mostaza c/puré", "Filet de merluza c/papas hervidas",
+  "Ñoquis", "Albóndigas c/puré", "Tartas",
+];
+
+let platoDelDiaActual = "Milanesa napolitana c/omelete de zanahoria";
+
+function buildMenu(){
+  return [
+    { cat:"Plato del día", items:[
+      { nombre: platoDelDiaActual, desc:"Incluye pan y postre", precio:8000 },
+    ]},
+    { cat:"Menú", items: PLATOS_DEL_DIA.map(p => ({ nombre:p, desc:"Sin pan ni postre", precio:10000 })) },
+    { cat:"Pastas Frescas", items:[
+      { nombre:"Ravioles", desc:"A elección: pollo y jamón / muzzarella y ricota / 4 quesos", precio:8000 },
+      { nombre:"Sorrentinos", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:8000 },
+      { nombre:"Ñoquis", desc:"Caseros, de papa", precio:8000 },
+      { nombre:"Tallarines", desc:"Caseros", precio:8000 },
+      { nombre:"Canelones", desc:"A elección: verdura / jamón y queso", precio:8000 },
+      { nombre:"Lasagna", desc:"Casera, a la bolognesa", precio:8000 },
+    ]},
+    { cat:"Pizzas", items:[
+      { nombre:"Pizza de muzzarella (2 unidades)", desc:"Listas para disfrutar", precio:10000 },
+      { nombre:"Focaccia", desc:"Se hace a pedido — consultanos sabor, precio y tiempo de entrega", precio:null },
+    ]},
+    { cat:"Congelados", items:[
+      { nombre:"Ravioles congelados (1 plancha)", desc:"A elección: ricota y muzza / 4 quesos / pollo", precio:4500 },
+      { nombre:"Ravioles congelados (5 planchas)", desc:"A elección: ricota y muzza / 4 quesos / pollo", precio:22000 },
+      { nombre:"Sorrentinos congelados (1 docena)", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:5000 },
+      { nombre:"Sorrentinos congelados (5 docenas)", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:23000 },
+      { nombre:"Canelones congelados (½ docena)", desc:"A elección: verdura / jamón y queso", precio:8000 },
+      { nombre:"Canelones congelados (1 docena)", desc:"A elección: verdura / jamón y queso", precio:15000 },
+      { nombre:"Pizza muzzarella (congelada)", desc:"Lista para hornear", precio:15000 },
+      { nombre:"Pizza jamón y muzzarella (congelada)", desc:"Lista para hornear", precio:9000 },
+      { nombre:"Pizza especial (congelada)", desc:"Lista para hornear", precio:10000 },
+      { nombre:"Pizza muzza y anchoas (congelada)", desc:"Lista para hornear", precio:10000 },
+    ]},
+    { cat:"Sandwichería", items:[
+      { nombre:"Milanesa en bandeja", desc:"Con papas fritas o ensalada", precio:10000 },
+      { nombre:"Milanesa en sandwich", desc:"Con papas fritas o ensalada", precio:11000 },
+      { nombre:"Hamburguesa en pan", desc:"Con papas fritas o ensalada", precio:9000 },
+    ]},
+  ];
+}
+let MENU = buildMenu();
+
+let cart = {};
+let activeCat = "Todos";
+
+function toggleAdmin(){
+  const panel = document.getElementById("adminPanel");
+  panel.classList.toggle("open");
+  if(panel.classList.contains("open")){
+    document.getElementById("claveInput").value = "";
+    document.getElementById("platoInput").value = platoDelDiaActual;
+    document.getElementById("platoEstado").textContent = "";
+  }
+}
+
+async function guardarPlato(){
+  const clave = document.getElementById("claveInput").value;
+  const nuevo = document.getElementById("platoInput").value.trim();
+  const estado = document.getElementById("platoEstado");
+
+  if(!nuevo){ estado.textContent = "Escribí un plato antes de guardar."; return; }
+  estado.textContent = "Guardando...";
+
+  try{
+    const res = await fetch(PLATO_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: clave, plato: nuevo }),
+    });
+    const data = await res.json();
+
+    if(res.status === 401){
+      estado.textContent = "Clave incorrecta.";
+      return;
+    }
+    if(!res.ok){
+      estado.textContent = data.error || "No se pudo guardar, probá de nuevo.";
+      return;
+    }
+
+    platoDelDiaActual = nuevo;
+    MENU = buildMenu();
+    renderCats();
+    renderMenu();
+    renderComanda();
+    estado.textContent = "¡Listo! Ya cambió para todos.";
+    setTimeout(()=>{ document.getElementById("adminPanel").classList.remove("open"); }, 1200);
+  }catch(err){
+    estado.textContent = "Error de conexión. Probá de nuevo.";
+  }
+}
+
+async function cargarPlatoGuardado(){
+  try{
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(PLATO_API, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if(res.ok){
+      const data = await res.json();
+      if(data.plato){
+        platoDelDiaActual = data.plato;
+        MENU = buildMenu();
+        renderMenu();
+      }
+    }
+  }catch(err){
+    // sin conexión a la función (por ejemplo, si se está probando fuera de Netlify) — se usa el valor por defecto
+  }
+}
+
+function renderCats(){
+  const nav = document.getElementById("catsNav");
+  const cats = ["Todos", ...MENU.map(c=>c.cat)];
+  nav.innerHTML = cats.map(c =>
+    `<button class="${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</button>`
+  ).join("");
+}
+function setCat(c){ activeCat = c; renderCats(); renderMenu(); }
+
+function renderMenu(){
+  const el = document.getElementById("menu");
+  const cats = activeCat==="Todos" ? MENU : MENU.filter(c=>c.cat===activeCat);
+  el.innerHTML = cats.map(cat => `
+    <section class="categoria">
+      <div class="cat-header"><h2>${cat.cat}</h2><span class="cnt">${cat.items.length} opciones</span><hr></div>
+      ${cat.items.map(it=>{
+        const key = cat.cat+"|"+it.nombre;
+        const cant = cart[key] ? cart[key].cant : 0;
+        if(it.precio === null){
+          const msg = encodeURIComponent(`Hola! Quería consultar por: ${it.nombre}`);
+          return `
+          <div class="item">
+            <div class="item-info">
+              <h3>${it.nombre}</h3>
+              <p>${it.desc}</p>
+            </div>
+            <div class="item-actions">
+              <span class="item-price">Consultar</span>
+              <a class="add-btn" style="text-decoration:none;" href="https://wa.me/${WHATSAPP_NUMBER}?text=${msg}" target="_blank">Preguntar</a>
+            </div>
+          </div>`;
+        }
+        return `
+        <div class="item">
+          <div class="item-info">
+            <h3>${it.nombre}</h3>
+            <p>${it.desc}</p>
+          </div>
+          <div class="item-actions">
+            <span class="item-price">$${it.precio.toLocaleString('es-AR')}</span>
+            ${cant>0 ? `
+              <div class="stepper">
+                <button onclick="cambiarCant('${key}','${cat.cat}','${it.nombre}',${it.precio},-1)">−</button>
+                <span>${cant}</span>
+                <button onclick="cambiarCant('${key}','${cat.cat}','${it.nombre}',${it.precio},1)">+</button>
+              </div>
+            ` : `<button class="add-btn" onclick="cambiarCant('${key}','${cat.cat}','${it.nombre}',${it.precio},1)">Agregar</button>`}
+          </div>
+        </div>`;
+      }).join("")}
+    </section>
+  `).join("");
+}
+
+function cambiarCant(key, cat, nombre, precio, delta){
+  if(!cart[key]) cart[key] = {nombre, precio, cant:0};
+  cart[key].cant += delta;
+  if(cart[key].cant<=0) delete cart[key];
+  renderMenu();
+  renderComanda();
+}
+
+function renderComanda(){
+  const body = document.getElementById("comandaBody");
+  const totalWrap = document.getElementById("comandaTotal");
+  const keys = Object.keys(cart);
+  const wspBtn = document.getElementById("wspBtn");
+  const mobileBar = document.getElementById("mobileCartBar");
+
+  if(keys.length===0){
+    body.innerHTML = `<div class="comanda-empty">Todavía no agregaste nada.<br>Elegí algo rico del menú →</div>`;
+    totalWrap.style.display="none";
+    wspBtn.classList.add("disabled");
+    mobileBar.classList.remove("visible");
+    return;
+  }
+
+  let total = 0;
+  let totalCant = 0;
+  body.innerHTML = keys.map(k=>{
+    const it = cart[k];
+    total += it.precio*it.cant;
+    totalCant += it.cant;
+    return `<div class="comanda-line">
+      <span class="nom">${it.nombre}</span>
+      <span class="qty">x${it.cant}</span>
+      <span>$${(it.precio*it.cant).toLocaleString('es-AR')}</span>
+      <button class="rm" onclick="quitar('${k}')">✕</button>
+    </div>`;
+  }).join("");
+
+  document.getElementById("totalNum").textContent = "$"+total.toLocaleString('es-AR');
+  totalWrap.style.display="flex";
+  wspBtn.classList.remove("disabled");
+
+  document.getElementById("mobileCartCount").textContent = `${totalCant} ${totalCant===1?'ítem':'ítems'}`;
+  document.getElementById("mobileCartTotal").textContent = "$"+total.toLocaleString('es-AR');
+  mobileBar.classList.add("visible");
+
+  actualizarLinkWhatsapp(total);
+}
+
+function quitar(key){ delete cart[key]; renderMenu(); renderComanda(); }
+
+function actualizarLinkWhatsapp(total){
+  const nota = document.getElementById("nota").value.trim();
+  let texto = "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
+  Object.values(cart).forEach(it=>{
+    texto += `• ${it.nombre} x${it.cant} — $${(it.precio*it.cant).toLocaleString('es-AR')}\n`;
+  });
+  texto += `\nTOTAL: $${total.toLocaleString('es-AR')}`;
+  if(nota) texto += `\n\nAclaración: ${nota}`;
+  texto += `\n\n(Pedido hecho desde la web)`;
+  document.getElementById("wspBtn").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
+}
+
+document.getElementById("nota").addEventListener("input", ()=>{
+  let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
+  actualizarLinkWhatsapp(total);
+});
+
+function copiarAlias(e){
+  navigator.clipboard.writeText(ALIAS).then(()=>{
+    const btn = e.target;
+    const old = btn.textContent;
+    btn.textContent = "¡Copiado!";
+    btn.classList.add("ok");
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove("ok"); }, 1600);
+  });
+}
+
+document.getElementById("aliasVal").textContent = ALIAS;
+
+renderCats();
+renderMenu();
+renderComanda();
+cargarPlatoGuardado();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
