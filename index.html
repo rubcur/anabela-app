@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --paper:#F1E6D2;
@@ -180,34 +181,6 @@
   footer.note{
     text-align:center; font-size:12px; color:#8a8574; margin-top:26px; font-family:'Space Mono',monospace;
   }
-
-  .admin-link{
-    background:none; border:none; color:#8a8574; font-family:'Space Mono',monospace;
-    font-size:11px; text-decoration:underline; cursor:pointer; margin-top:14px; padding:4px;
-  }
-  .admin-panel{
-    display:none; max-width:420px; margin:14px auto 0; background:var(--paper-light);
-    border:1px solid var(--linea); border-radius:10px; padding:16px 18px; text-align:left;
-  }
-  .admin-panel.open{ display:block; }
-  .admin-panel label{
-    font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase;
-    letter-spacing:.08em; color:var(--oliva); display:block; margin-bottom:6px;
-  }
-  .admin-panel input[type=text], .admin-panel input[type=password]{
-    width:100%; padding:9px 10px; border:1px solid var(--linea); border-radius:6px;
-    font-family:'Karla',sans-serif; font-size:14px; margin-bottom:10px;
-  }
-  .admin-panel .row{ display:flex; gap:8px; }
-  .admin-panel button.guardar{
-    background:var(--oliva); color:var(--paper-light); border:none; border-radius:6px;
-    padding:9px 16px; font-family:'Space Mono',monospace; font-size:12px; cursor:pointer; flex:1;
-  }
-  .admin-panel button.cancelar{
-    background:none; border:1px solid var(--linea); border-radius:6px; padding:9px 16px;
-    font-family:'Space Mono',monospace; font-size:12px; cursor:pointer;
-  }
-  .admin-panel .estado{ font-size:11px; margin-top:8px; font-family:'Space Mono',monospace; color:var(--oliva); }
 </style>
 </head>
 <body>
@@ -255,146 +228,46 @@
 
   <footer class="note">
     Recordá enviar el comprobante de transferencia junto con tu pedido por WhatsApp ✓
-    <br>
-    <button class="admin-link" onclick="toggleAdmin()">✎ Cambiar plato del día</button>
-    <div class="admin-panel" id="adminPanel">
-      <label>Clave de acceso</label>
-      <input type="password" id="claveInput" placeholder="Ingresá la clave">
-      <label>Plato del día de hoy</label>
-      <input type="text" id="platoInput" placeholder="Ej: Milanesa napolitana c/omelete de zanahoria">
-      <div class="row">
-        <button class="guardar" onclick="guardarPlato()">Guardar</button>
-        <button class="cancelar" onclick="toggleAdmin()">Cancelar</button>
-      </div>
-      <div class="estado" id="platoEstado"></div>
-    </div>
   </footer>
 </div>
 
 <script>
 const WHATSAPP_NUMBER = "5492262475144";
 const ALIAS = "anabela-pastas";
-const PLATO_API = "/.netlify/functions/plato"; // la clave real vive en el servidor, no acá
 
-const PLATOS_DEL_DIA = [
-  "Pastel de papas", "Guiso de lentejas", "Pollo con papas y batatas al horno",
-  "Ravioles", "Chuletas de cerdo con puré", "Zapallitos rellenos",
-  "Canelones con bolognesa", "Fajitas de pollo a la portuguesa", "Pastel de bondiola",
-  "Pizza de anchoas con muzzarella", "Milanesa napolitana c/omelete de zanahoria",
-  "Lasagna c/bolognesa", "Tallarines caseros c/crema de champignones",
-  "Suprema a la mostaza c/puré", "Filet de merluza c/papas hervidas",
-  "Ñoquis", "Albóndigas c/puré", "Tartas",
-];
+// 👉 COMPLETAR después de crear el proyecto en Supabase (Project Settings → API)
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+const SUPABASE_ANON_KEY = "TU-ANON-KEY-AQUI";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let platoDelDiaActual = "Milanesa napolitana c/omelete de zanahoria";
+let MENU = []; // se llena desde Supabase en cargarCatalogo()
 
-function buildMenu(){
-  return [
-    { cat:"Plato del día", items:[
-      { nombre: platoDelDiaActual, desc:"Incluye pan y postre", precio:8000 },
-    ]},
-    { cat:"Menú", items: PLATOS_DEL_DIA.map(p => ({ nombre:p, desc:"Sin pan ni postre", precio:10000 })) },
-    { cat:"Pastas Frescas", items:[
-      { nombre:"Ravioles", desc:"A elección: pollo y jamón / muzzarella y ricota / 4 quesos", precio:8000 },
-      { nombre:"Sorrentinos", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:8000 },
-      { nombre:"Ñoquis", desc:"Caseros, de papa", precio:8000 },
-      { nombre:"Tallarines", desc:"Caseros", precio:8000 },
-      { nombre:"Canelones", desc:"A elección: verdura / jamón y queso", precio:8000 },
-      { nombre:"Lasagna", desc:"Casera, a la bolognesa", precio:8000 },
-    ]},
-    { cat:"Pizzas", items:[
-      { nombre:"Pizza de muzzarella (2 unidades)", desc:"Listas para disfrutar", precio:10000 },
-      { nombre:"Focaccia", desc:"Se hace a pedido — consultanos sabor, precio y tiempo de entrega", precio:null },
-    ]},
-    { cat:"Congelados", items:[
-      { nombre:"Ravioles congelados (1 plancha)", desc:"A elección: ricota y muzza / 4 quesos / pollo", precio:4500 },
-      { nombre:"Ravioles congelados (5 planchas)", desc:"A elección: ricota y muzza / 4 quesos / pollo", precio:22000 },
-      { nombre:"Sorrentinos congelados (1 docena)", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:5000 },
-      { nombre:"Sorrentinos congelados (5 docenas)", desc:"A elección: jamón y queso / calabaza y muzzarella / ricota y nuez / verdura", precio:23000 },
-      { nombre:"Canelones congelados (½ docena)", desc:"A elección: verdura / jamón y queso", precio:8000 },
-      { nombre:"Canelones congelados (1 docena)", desc:"A elección: verdura / jamón y queso", precio:15000 },
-      { nombre:"Pizza muzzarella (congelada)", desc:"Lista para hornear", precio:15000 },
-      { nombre:"Pizza jamón y muzzarella (congelada)", desc:"Lista para hornear", precio:9000 },
-      { nombre:"Pizza especial (congelada)", desc:"Lista para hornear", precio:10000 },
-      { nombre:"Pizza muzza y anchoas (congelada)", desc:"Lista para hornear", precio:10000 },
-    ]},
-    { cat:"Sandwichería", items:[
-      { nombre:"Milanesa en bandeja", desc:"Con papas fritas o ensalada", precio:10000 },
-      { nombre:"Milanesa en sandwich", desc:"Con papas fritas o ensalada", precio:11000 },
-      { nombre:"Hamburguesa en pan", desc:"Con papas fritas o ensalada", precio:9000 },
-    ]},
-  ];
+async function cargarCatalogo(){
+  const menuEl = document.getElementById("menu");
+  menuEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:#8a8574;font-family:'Space Mono',monospace;font-size:13px;">Cargando menú...</div>`;
+
+  const { data: cats, error: e1 } = await sb.from("categorias").select("*").eq("activa", true).order("orden");
+  const { data: prods, error: e2 } = await sb.from("productos").select("*").eq("disponible", true).order("orden");
+
+  if(e1 || e2){
+    menuEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--tomate);">No se pudo cargar el menú. Probá recargar la página.</div>`;
+    return;
+  }
+
+  MENU = cats.map(cat => ({
+    cat: cat.nombre,
+    items: prods
+      .filter(p => p.categoria_id === cat.id)
+      .map(p => ({ nombre:p.nombre, desc:p.descripcion, precio:p.precio, destacado:p.destacado }))
+  })).filter(c => c.items.length > 0);
+
+  renderCats();
+  renderMenu();
+  renderComanda();
 }
-let MENU = buildMenu();
 
 let cart = {};
 let activeCat = "Todos";
-
-function toggleAdmin(){
-  const panel = document.getElementById("adminPanel");
-  panel.classList.toggle("open");
-  if(panel.classList.contains("open")){
-    document.getElementById("claveInput").value = "";
-    document.getElementById("platoInput").value = platoDelDiaActual;
-    document.getElementById("platoEstado").textContent = "";
-  }
-}
-
-async function guardarPlato(){
-  const clave = document.getElementById("claveInput").value;
-  const nuevo = document.getElementById("platoInput").value.trim();
-  const estado = document.getElementById("platoEstado");
-
-  if(!nuevo){ estado.textContent = "Escribí un plato antes de guardar."; return; }
-  estado.textContent = "Guardando...";
-
-  try{
-    const res = await fetch(PLATO_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: clave, plato: nuevo }),
-    });
-    const data = await res.json();
-
-    if(res.status === 401){
-      estado.textContent = "Clave incorrecta.";
-      return;
-    }
-    if(!res.ok){
-      estado.textContent = data.error || "No se pudo guardar, probá de nuevo.";
-      return;
-    }
-
-    platoDelDiaActual = nuevo;
-    MENU = buildMenu();
-    renderCats();
-    renderMenu();
-    renderComanda();
-    estado.textContent = "¡Listo! Ya cambió para todos.";
-    setTimeout(()=>{ document.getElementById("adminPanel").classList.remove("open"); }, 1200);
-  }catch(err){
-    estado.textContent = "Error de conexión. Probá de nuevo.";
-  }
-}
-
-async function cargarPlatoGuardado(){
-  try{
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(PLATO_API, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if(res.ok){
-      const data = await res.json();
-      if(data.plato){
-        platoDelDiaActual = data.plato;
-        MENU = buildMenu();
-        renderMenu();
-      }
-    }
-  }catch(err){
-    // sin conexión a la función (por ejemplo, si se está probando fuera de Netlify) — se usa el valor por defecto
-  }
-}
 
 function renderCats(){
   const nav = document.getElementById("catsNav");
@@ -529,10 +402,7 @@ function copiarAlias(e){
 
 document.getElementById("aliasVal").textContent = ALIAS;
 
-renderCats();
-renderMenu();
-renderComanda();
-cargarPlatoGuardado();
+cargarCatalogo();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {

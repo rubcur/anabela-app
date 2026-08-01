@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anabela — Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --paper:#F1E6D2; --paper-light:#FBF6EA; --ink:#2E2A22;
+    --tomate:#C1442D; --oliva:#5B6B45; --linea: rgba(46,42,34,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Karla',sans-serif; min-height:100vh; }
+  .wrap{ max-width:900px; margin:0 auto; padding:24px 16px 80px; }
+  h1{ font-family:'Fraunces',serif; font-weight:600; font-size:28px; margin:0 0 4px; }
+  .sub{ font-family:'Space Mono',monospace; font-size:11px; color:var(--oliva); text-transform:uppercase; letter-spacing:.1em; margin-bottom:24px; }
+
+  .card{ background:var(--paper-light); border:1px solid var(--linea); border-radius:10px; padding:18px; margin-bottom:14px; }
+
+  /* Login */
+  #loginBox{ max-width:340px; margin:60px auto; }
+  input, select, textarea{
+    width:100%; padding:9px 10px; border:1px solid var(--linea); border-radius:6px;
+    font-family:'Karla',sans-serif; font-size:14px; margin-bottom:10px; background:#fff;
+  }
+  label{ font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--oliva); display:block; margin-bottom:4px; }
+  button{
+    font-family:'Space Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:.03em;
+    border:none; border-radius:6px; padding:9px 14px; cursor:pointer;
+  }
+  .btn-primario{ background:var(--oliva); color:var(--paper-light); }
+  .btn-peligro{ background:var(--tomate); color:#fff; }
+  .btn-secundario{ background:none; border:1px solid var(--linea); color:var(--ink); }
+  .error{ color:var(--tomate); font-size:12.5px; margin-top:6px; }
+
+  header.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+
+  .cat-titulo{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; margin:26px 0 10px; display:flex; justify-content:space-between; align-items:center; }
+  .fila{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .fila-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .check-row{ display:flex; gap:16px; align-items:center; font-size:13px; margin-bottom:10px; }
+  .check-row label{ display:flex; align-items:center; gap:6px; font-family:'Karla',sans-serif; text-transform:none; letter-spacing:0; color:var(--ink); margin:0; }
+  .check-row input[type=checkbox]{ width:auto; margin:0; }
+  .acciones{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .estado-msg{ font-family:'Space Mono',monospace; font-size:11px; color:var(--oliva); margin-left:10px; }
+  #loading, #sinDatos{ text-align:center; padding:40px 0; color:#8a8574; font-family:'Space Mono',monospace; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="loginBox" class="card">
+    <h1>Anabela — Admin</h1>
+    <div class="sub">Acceso restringido</div>
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="tu@email.com">
+    <label>Contraseña</label>
+    <input type="password" id="loginPass" placeholder="••••••••">
+    <button class="btn-primario" style="width:100%;" onclick="login()">Ingresar</button>
+    <div class="error" id="loginError"></div>
+  </div>
+
+  <div id="appBox" style="display:none;">
+    <header class="topbar">
+      <div>
+        <h1>Catálogo</h1>
+        <div class="sub">Anabela Cocina Casera — /admin</div>
+      </div>
+      <button class="btn-secundario" onclick="logout()">Salir</button>
+    </header>
+
+    <div id="loading">Cargando catálogo...</div>
+    <div id="categorias"></div>
+  </div>
+
+</div>
+
+<script>
+// 👉 COMPLETAR después de crear el proyecto en Supabase (Project Settings → API)
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+const SUPABASE_ANON_KEY = "TU-ANON-KEY-AQUI";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let categorias = [];
+let productos = [];
+
+async function login(){
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPass").value;
+  const errBox = document.getElementById("loginError");
+  errBox.textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errBox.textContent = "Email o contraseña incorrectos."; return; }
+  mostrarApp();
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  document.getElementById("appBox").style.display = "none";
+  document.getElementById("loginBox").style.display = "block";
+}
+
+async function mostrarApp(){
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("appBox").style.display = "block";
+  await cargarTodo();
+}
+
+async function cargarTodo(){
+  document.getElementById("loading").style.display = "block";
+  const { data: cats, error: e1 } = await sb.from("categorias").select("*").order("orden");
+  const { data: prods, error: e2 } = await sb.from("productos").select("*").order("orden");
+  document.getElementById("loading").style.display = "none";
+  if(e1 || e2){ alert("Error cargando datos: " + ((e1||e2).message)); return; }
+  categorias = cats;
+  productos = prods;
+  render();
+}
+
+function render(){
+  const el = document.getElementById("categorias");
+  el.innerHTML = categorias.map(cat => {
+    const items = productos.filter(p => p.categoria_id === cat.id);
+    return `
+      <div class="cat-titulo">
+        <span>${cat.nombre} <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);">(${items.length})</span></span>
+        <button class="btn-primario" onclick="agregarProducto(${cat.id})">+ Agregar</button>
+      </div>
+      ${items.map(p => filaProducto(p, cat.id)).join("")}
+    `;
+  }).join("");
+}
+
+function filaProducto(p, catId){
+  const opcionesCat = categorias.map(c => `<option value="${c.id}" ${c.id===catId?'selected':''}>${c.nombre}</option>`).join("");
+  return `
+  <div class="card" id="prod-${p.id}">
+    <label>Nombre</label>
+    <input type="text" id="nombre-${p.id}" value="${escapeAttr(p.nombre)}">
+
+    <label>Descripción</label>
+    <textarea id="desc-${p.id}" rows="2">${escapeHtml(p.descripcion||'')}</textarea>
+
+    <div class="fila">
+      <div>
+        <label>Precio (vacío = "Consultar")</label>
+        <input type="number" step="0.01" id="precio-${p.id}" value="${p.precio===null?'':p.precio}">
+      </div>
+      <div>
+        <label>Categoría</label>
+        <select id="cat-${p.id}">${opcionesCat}</select>
+      </div>
+    </div>
+
+    <div class="fila">
+      <div>
+        <label>Orden dentro de la categoría</label>
+        <input type="number" id="orden-${p.id}" value="${p.orden}">
+      </div>
+      <div>
+        <label>Foto (URL, opcional)</label>
+        <input type="text" id="foto-${p.id}" value="${escapeAttr(p.foto_url||'')}">
+      </div>
+    </div>
+
+    <div class="check-row">
+      <label><input type="checkbox" id="disp-${p.id}" ${p.disponible?'checked':''}> Disponible (visible para clientes)</label>
+      <label><input type="checkbox" id="dest-${p.id}" ${p.destacado?'checked':''}> Destacado</label>
+    </div>
+
+    <div class="acciones">
+      <button class="btn-primario" onclick="guardarProducto('${p.id}')">Guardar</button>
+      <button class="btn-secundario" onclick="duplicarProducto('${p.id}')">Duplicar</button>
+      <button class="btn-peligro" onclick="eliminarProducto('${p.id}')">Eliminar</button>
+      <span class="estado-msg" id="msg-${p.id}"></span>
+    </div>
+  </div>`;
+}
+
+function leerFormulario(id){
+  const precioVal = document.getElementById(`precio-${id}`).value;
+  return {
+    nombre: document.getElementById(`nombre-${id}`).value.trim(),
+    descripcion: document.getElementById(`desc-${id}`).value.trim(),
+    categoria_id: parseInt(document.getElementById(`cat-${id}`).value),
+    precio: precioVal === "" ? null : parseFloat(precioVal),
+    orden: parseInt(document.getElementById(`orden-${id}`).value) || 0,
+    foto_url: document.getElementById(`foto-${id}`).value.trim() || null,
+    disponible: document.getElementById(`disp-${id}`).checked,
+    destacado: document.getElementById(`dest-${id}`).checked,
+  };
+}
+
+async function guardarProducto(id){
+  const msg = document.getElementById(`msg-${id}`);
+  msg.textContent = "Guardando...";
+  const cambios = leerFormulario(id);
+  const { error } = await sb.from("productos").update(cambios).eq("id", id);
+  msg.textContent = error ? "Error al guardar" : "¡Guardado!";
+  if(!error) await cargarTodo();
+}
+
+async function eliminarProducto(id){
+  if(!confirm("¿Seguro que querés eliminar este producto? No se puede deshacer.")) return;
+  const { error } = await sb.from("productos").delete().eq("id", id);
+  if(error){ alert("Error al eliminar: " + error.message); return; }
+  await cargarTodo();
+}
+
+async function duplicarProducto(id){
+  const p = productos.find(x => x.id === id);
+  if(!p) return;
+  const copia = {
+    nombre: p.nombre + " (copia)",
+    descripcion: p.descripcion,
+    categoria_id: p.categoria_id,
+    precio: p.precio,
+    orden: p.orden,
+    foto_url: p.foto_url,
+    disponible: false, // arranca oculta para que la revises antes de publicarla
+    destacado: false,
+  };
+  const { error } = await sb.from("productos").insert(copia);
+  if(error){ alert("Error al duplicar: " + error.message); return; }
+  await cargarTodo();
+}
+
+async function agregarProducto(catId){
+  const nuevo = {
+    nombre: "Producto nuevo",
+    descripcion: "",
+    categoria_id: catId,
+    precio: 0,
+    orden: 999,
+    disponible: false, // arranca oculto hasta que lo completes
+    destacado: false,
+  };
+  const { error } = await sb.from("productos").insert(nuevo);
+  if(error){ alert("Error al crear: " + error.message); return; }
+  await cargarTodo();
+}
+
+function escapeHtml(str){ return str.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escapeAttr(str){ return escapeHtml(str).replace(/"/g,'&quot;'); }
+
+// Al cargar la página, revisar si ya había una sesión activa
+sb.auth.getSession().then(({ data }) => {
+  if(data.session) mostrarApp();
+});
+</script>
+</body>
+</html>
