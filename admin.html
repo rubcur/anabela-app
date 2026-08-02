@@ -168,9 +168,17 @@ function filaProducto(p, catId){
       </div>
     </div>
 
+    <label>Etiqueta (opcional)</label>
+    <select id="etq-${p.id}">
+      <option value="" ${!p.etiqueta?'selected':''}>Ninguna</option>
+      <option value="oferta" ${p.etiqueta==='oferta'?'selected':''}>🔥 Oferta</option>
+      <option value="recomendado" ${p.etiqueta==='recomendado'?'selected':''}>⭐ Recomendado</option>
+      <option value="nuevo" ${p.etiqueta==='nuevo'?'selected':''}>🆕 Nuevo</option>
+    </select>
+
     <div class="check-row">
       <label><input type="checkbox" id="disp-${p.id}" ${p.disponible?'checked':''}> Disponible (visible para clientes)</label>
-      <label><input type="checkbox" id="dest-${p.id}" ${p.destacado?'checked':''}> Destacado</label>
+      <label><input type="checkbox" id="dest-${p.id}" ${p.destacado?'checked':''}> Destacado (más presencia visual)</label>
     </div>
 
     <div class="acciones">
@@ -191,6 +199,7 @@ function leerFormulario(id){
     precio: precioVal === "" ? null : parseFloat(precioVal),
     orden: parseInt(document.getElementById(`orden-${id}`).value) || 0,
     foto_url: document.getElementById(`foto-${id}`).value.trim() || null,
+    etiqueta: document.getElementById(`etq-${id}`).value || null,
     disponible: document.getElementById(`disp-${id}`).checked,
     destacado: document.getElementById(`dest-${id}`).checked,
   };
@@ -222,6 +231,7 @@ async function duplicarProducto(id){
     precio: p.precio,
     orden: p.orden,
     foto_url: p.foto_url,
+    etiqueta: p.etiqueta,
     disponible: false, // arranca oculta para que la revises antes de publicarla
     destacado: false,
   };
