@@ -110,9 +110,14 @@
     font-family:'Space Mono',monospace; font-size:10.5px; color:var(--oliva);
     letter-spacing:.03em; background:var(--paper); padding:3px 9px; border-radius:99px;
   }
+  .cerrado-info{ display:flex; flex-direction:column; align-items:flex-end; }
   .cerrado-msg{
     font-family:'Space Mono',monospace; font-size:11px; color:var(--oliva);
     letter-spacing:.02em; white-space:nowrap; text-align:right; line-height:1.5;
+  }
+  .consultar-stock{
+    display:block; margin-top:3px; text-align:right; font-family:'Space Mono',monospace;
+    font-size:10px; color:var(--oliva); text-decoration:underline;
   }
   .item-info{ flex:1; min-width:0; }
   .item-info h3{ font-family:'Fraunces', serif; font-weight:600; font-size:17px; margin:0 0 4px; }
@@ -380,7 +385,10 @@ function renderMenu(){
               <p>${it.desc}</p>
             </div>
             <div class="item-actions">
-              <span class="cerrado-msg">🕚 Se pide<br>hasta las ${cat.horaLimiteTexto} hs</span>
+              <div class="cerrado-info">
+                <span class="cerrado-msg">🕚 Se pide<br>hasta las ${cat.horaLimiteTexto} hs</span>
+                <a class="consultar-stock" href="https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hola! Quería consultar si todavía tenés disponible: '+it.nombre)}" target="_blank">Consultar stock</a>
+              </div>
             </div>
           </div>`;
         }
