@@ -56,6 +56,18 @@
     color:var(--oliva); font-size:16px; margin-top:8px;
   }
 
+  .estado-local{
+    display:inline-flex; align-items:center; gap:6px; margin-top:10px;
+    font-family:'Space Mono',monospace; font-size:11.5px; letter-spacing:.02em;
+    background:var(--paper-light); border:1px solid var(--linea); border-radius:99px;
+    padding:5px 12px;
+  }
+  .estado-local .punto{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .estado-local.abierto .punto{ background:var(--oliva); }
+  .estado-local.abierto{ color:var(--oliva); }
+  .estado-local.cerrado .punto{ background:#8a8574; }
+  .estado-local.cerrado{ color:#6b6656; }
+
   .layout{display:grid; grid-template-columns:1fr 340px; gap:28px; align-items:start;}
   @media (max-width:860px){ .layout{grid-template-columns:1fr;} }
 
@@ -227,7 +239,8 @@
   <header class="top">
     <div class="eyebrow">Necochea · Pastas / Pizzas / Focaccias / Viandas / Sandwichería</div>
     <h1 class="brand">Anabela <em>Cocina Casera</em></h1>
-    <div class="tagline">"como en casa, pero te lo llevás"</div>
+    <div class="tagline">"Hoy cocinamos para vos"</div>
+    <div class="estado-local" id="estadoLocal"></div>
   </header>
 
   <div class="layout">
@@ -508,6 +521,59 @@ function copiarAlias(e){
 }
 
 document.getElementById("aliasVal").textContent = ALIAS;
+
+// Horarios reales del local. Formato: [hora_inicio*60, hora_fin*60] en minutos.
+// getDay(): 0=domingo, 1=lunes, 2=martes, 3=miércoles, 4=jueves, 5=viernes, 6=sábado
+const HORARIOS_LOCAL = {
+  0: [[19*60+30, 23*60]],                       // domingo
+  1: [[10*60+30, 15*60]],                       // lunes
+  2: [[10*60+30, 15*60]],                       // martes
+  3: [[10*60+30, 15*60], [19*60+30, 23*60]],    // miércoles
+  4: [[10*60+30, 15*60], [19*60+30, 23*60]],    // jueves
+  5: [[10*60+30, 15*60], [19*60+30, 23*60]],    // viernes
+  6: [[19*60+30, 23*60]],                       // sábado
+};
+const NOMBRES_DIA = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+function formatoMinutos(min){
+  const h = Math.floor(min/60), m = min%60;
+  return `${h}:${m.toString().padStart(2,'0')}`;
+}
+
+function estadoDelLocal(){
+  const ahora = new Date();
+  const minutosAhora = ahora.getHours()*60 + ahora.getMinutes();
+
+  for(let i=0; i<8; i++){
+    const fecha = new Date(ahora);
+    fecha.setDate(ahora.getDate()+i);
+    const dia = fecha.getDay();
+    const rangos = HORARIOS_LOCAL[dia] || [];
+    for(const [ini, fin] of rangos){
+      if(i===0){
+        if(minutosAhora >= ini && minutosAhora < fin){
+          return { abierto:true, texto:`Abierto ahora · cierra a las ${formatoMinutos(fin)} hs` };
+        }
+        if(minutosAhora < ini){
+          return { abierto:false, texto:`Cerrado ahora · abre hoy a las ${formatoMinutos(ini)} hs` };
+        }
+      } else {
+        return { abierto:false, texto:`Cerrado ahora · abre el ${NOMBRES_DIA[dia]} a las ${formatoMinutos(ini)} hs` };
+      }
+    }
+  }
+  return { abierto:false, texto:"Cerrado ahora" };
+}
+
+function renderEstadoLocal(){
+  const el = document.getElementById("estadoLocal");
+  const { abierto, texto } = estadoDelLocal();
+  el.className = "estado-local " + (abierto ? "abierto" : "cerrado");
+  el.innerHTML = `<span class="punto"></span>${texto}`;
+}
+
+renderEstadoLocal();
+setInterval(renderEstadoLocal, 60000); // se actualiza solo cada un minuto
 
 cargarCatalogo();
 
