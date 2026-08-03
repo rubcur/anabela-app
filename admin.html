@@ -43,6 +43,9 @@
   .fila{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .fila-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
   .check-row{ display:flex; gap:16px; align-items:center; font-size:13px; margin-bottom:10px; }
+  .foto-upload-row{ display:flex; gap:12px; align-items:center; margin-bottom:14px; }
+  .foto-upload-row input[type=file]{ margin-bottom:6px; font-size:12px; }
+  .foto-preview{ width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--linea); flex-shrink:0; }
   .check-row label{ display:flex; align-items:center; gap:6px; font-family:'Karla',sans-serif; text-transform:none; letter-spacing:0; color:var(--ink); margin:0; }
   .check-row input[type=checkbox]{ width:auto; margin:0; }
   .acciones{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
@@ -163,8 +166,17 @@ function filaProducto(p, catId){
         <input type="number" id="orden-${p.id}" value="${p.orden}">
       </div>
       <div>
-        <label>Foto (URL, opcional)</label>
-        <input type="text" id="foto-${p.id}" value="${escapeAttr(p.foto_url||'')}">
+        <label>Foto (URL)</label>
+        <input type="text" id="foto-${p.id}" value="${escapeAttr(p.foto_url||'')}" placeholder="Se completa sola al subir una imagen">
+      </div>
+    </div>
+
+    <div class="foto-upload-row">
+      ${p.foto_url ? `<img src="${escapeAttr(p.foto_url)}" class="foto-preview">` : ""}
+      <div>
+        <input type="file" accept="image/*" id="file-${p.id}">
+        <button type="button" class="btn-secundario" onclick="subirFoto('${p.id}')">Subir foto</button>
+        <span class="estado-msg" id="foto-msg-${p.id}"></span>
       </div>
     </div>
 
@@ -203,6 +215,27 @@ function leerFormulario(id){
     disponible: document.getElementById(`disp-${id}`).checked,
     destacado: document.getElementById(`dest-${id}`).checked,
   };
+}
+
+async function subirFoto(id){
+  const input = document.getElementById(`file-${id}`);
+  const msg = document.getElementById(`foto-msg-${id}`);
+  if(!input.files || !input.files[0]){ msg.textContent = "Elegí una imagen primero"; return; }
+
+  const file = input.files[0];
+  if(file.size > 5*1024*1024){ msg.textContent = "La imagen pesa demasiado (máx. 5MB)"; return; }
+
+  msg.textContent = "Subiendo...";
+  const ext = file.name.split('.').pop();
+  const path = `${id}-${Date.now()}.${ext}`;
+
+  const { error: errorSubida } = await sb.storage.from('productos').upload(path, file, { upsert: true });
+  if(errorSubida){ msg.textContent = "Error al subir: " + errorSubida.message; return; }
+
+  const { data } = sb.storage.from('productos').getPublicUrl(path);
+  document.getElementById(`foto-${id}`).value = data.publicUrl;
+  msg.textContent = "¡Subida! Guardando...";
+  await guardarProducto(id);
 }
 
 async function guardarProducto(id){
