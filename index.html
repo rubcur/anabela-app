@@ -526,8 +526,8 @@ document.getElementById("aliasVal").textContent = ALIAS;
 // getDay(): 0=domingo, 1=lunes, 2=martes, 3=miércoles, 4=jueves, 5=viernes, 6=sábado
 const HORARIOS_LOCAL = {
   0: [[19*60+30, 23*60]],                       // domingo
-  1: [[10*60+30, 15*60]],                       // lunes
-  2: [[10*60+30, 15*60]],                       // martes
+  1: [[10*60+30, 15*60]],                       // lunes (único día sin turno noche)
+  2: [[10*60+30, 15*60], [19*60+30, 23*60]],    // martes
   3: [[10*60+30, 15*60], [19*60+30, 23*60]],    // miércoles
   4: [[10*60+30, 15*60], [19*60+30, 23*60]],    // jueves
   5: [[10*60+30, 15*60], [19*60+30, 23*60]],    // viernes
