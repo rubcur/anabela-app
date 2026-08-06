@@ -423,6 +423,7 @@ function renderMenu(){
             </div>
             <div class="item-actions">
               <div class="cerrado-info">
+                ${it.precio !== null ? `<span class="item-price" style="display:block;text-align:right;">$${it.precio.toLocaleString('es-AR')}</span>` : ""}
                 <span class="cerrado-msg">🗓️ Disponible<br>los ${it.diasTexto}</span>
                 <a class="consultar-stock" href="https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hola! Quería consultar por: '+it.nombre)}" target="_blank">Preguntar</a>
               </div>
