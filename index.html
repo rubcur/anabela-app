@@ -337,11 +337,13 @@ async function cargarCatalogo(){
           const diasTexto = noEsHoy
             ? p.dias_disponible.map(d => NOMBRES_DIA[d].charAt(0).toUpperCase()+NOMBRES_DIA[d].slice(1)).join(" y ")
             : "";
+          const usaPrecioAlt = p.precio_alternativo != null && p.dias_precio_alternativo && p.dias_precio_alternativo.includes(diaHoy);
+          const precioEfectivo = usaPrecioAlt ? p.precio_alternativo : p.precio;
           return {
-            nombre:p.nombre, desc:p.descripcion, precio:p.precio,
+            nombre:p.nombre, desc:p.descripcion, precio:precioEfectivo,
             destacado:p.destacado, foto:p.foto_url,
             etiqueta: p.etiqueta || (esNuevoAuto ? "nuevo" : null),
-            noEsHoy, diasTexto,
+            noEsHoy, diasTexto, precioEspecialHoy: usaPrecioAlt,
           };
         })
     };
@@ -450,7 +452,7 @@ function renderMenu(){
             <p>${it.desc}</p>
           </div>
           <div class="item-actions">
-            <span class="item-price">$${it.precio.toLocaleString('es-AR')}</span>
+            <span class="item-price">$${it.precio.toLocaleString('es-AR')}${it.precioEspecialHoy ? ` <span class="badge-etiqueta etq-oferta">Hoy</span>` : ""}</span>
             ${cant>0 ? `
               <div class="stepper">
                 <button onclick="cambiarCant('${key}','${cat.cat}','${it.nombre}',${it.precio},-1)">−</button>

@@ -163,6 +163,15 @@ function filaProducto(p, catId){
       </div>
     </div>
 
+    <label>Precio alternativo (opcional — ej. una oferta puntual)</label>
+    <input type="number" step="0.01" id="precioAlt-${p.id}" value="${p.precio_alternativo===null||p.precio_alternativo===undefined?'':p.precio_alternativo}" placeholder="Dejalo vacío si no aplica">
+    <div class="dias-row" id="diasAlt-${p.id}">
+      ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((nombre, i) => {
+        const marcado = p.dias_precio_alternativo && p.dias_precio_alternativo.includes(i);
+        return `<label><input type="checkbox" value="${i}" ${marcado?'checked':''}> ${nombre}</label>`;
+      }).join("")}
+    </div>
+
     <div class="fila">
       <div>
         <label>Orden dentro de la categoría</label>
@@ -215,15 +224,21 @@ function filaProducto(p, catId){
 
 function leerFormulario(id){
   const precioVal = document.getElementById(`precio-${id}`).value;
+  const precioAltVal = document.getElementById(`precioAlt-${id}`).value;
   const diasCheckboxes = document.querySelectorAll(`#dias-${id} input[type=checkbox]`);
   const diasMarcados = Array.from(diasCheckboxes).filter(c => c.checked).map(c => parseInt(c.value));
   const diasDisponible = diasMarcados.length === 7 ? null : diasMarcados; // 7 tildados = sin restricción
+
+  const diasAltCheckboxes = document.querySelectorAll(`#diasAlt-${id} input[type=checkbox]`);
+  const diasAltMarcados = Array.from(diasAltCheckboxes).filter(c => c.checked).map(c => parseInt(c.value));
 
   return {
     nombre: document.getElementById(`nombre-${id}`).value.trim(),
     descripcion: document.getElementById(`desc-${id}`).value.trim(),
     categoria_id: parseInt(document.getElementById(`cat-${id}`).value),
     precio: precioVal === "" ? null : parseFloat(precioVal),
+    precio_alternativo: precioAltVal === "" ? null : parseFloat(precioAltVal),
+    dias_precio_alternativo: diasAltMarcados.length ? diasAltMarcados : null,
     orden: parseInt(document.getElementById(`orden-${id}`).value) || 0,
     foto_url: document.getElementById(`foto-${id}`).value.trim() || null,
     etiqueta: document.getElementById(`etq-${id}`).value || null,
@@ -282,6 +297,8 @@ async function duplicarProducto(id){
     foto_url: p.foto_url,
     etiqueta: p.etiqueta,
     dias_disponible: p.dias_disponible,
+    precio_alternativo: p.precio_alternativo,
+    dias_precio_alternativo: p.dias_precio_alternativo,
     disponible: false, // arranca oculta para que la revises antes de publicarla
     destacado: false,
   };
