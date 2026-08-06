@@ -43,6 +43,9 @@
   .fila{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .fila-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
   .check-row{ display:flex; gap:16px; align-items:center; font-size:13px; margin-bottom:10px; }
+  .dias-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; font-size:12.5px; }
+  .dias-row label{ display:flex; align-items:center; gap:4px; font-family:'Karla',sans-serif; text-transform:none; letter-spacing:0; color:var(--ink); margin:0; }
+  .dias-row input[type=checkbox]{ width:auto; margin:0; }
   .foto-upload-row{ display:flex; gap:12px; align-items:center; margin-bottom:14px; }
   .foto-upload-row input[type=file]{ margin-bottom:6px; font-size:12px; }
   .foto-preview{ width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--linea); flex-shrink:0; }
@@ -193,6 +196,14 @@ function filaProducto(p, catId){
       <label><input type="checkbox" id="dest-${p.id}" ${p.destacado?'checked':''}> Destacado (más presencia visual)</label>
     </div>
 
+    <label>Días disponible (dejalos todos tildados si es todos los días)</label>
+    <div class="dias-row" id="dias-${p.id}">
+      ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((nombre, i) => {
+        const marcado = !p.dias_disponible || p.dias_disponible.includes(i);
+        return `<label><input type="checkbox" value="${i}" ${marcado?'checked':''}> ${nombre}</label>`;
+      }).join("")}
+    </div>
+
     <div class="acciones">
       <button class="btn-primario" onclick="guardarProducto('${p.id}')">Guardar</button>
       <button class="btn-secundario" onclick="duplicarProducto('${p.id}')">Duplicar</button>
@@ -204,6 +215,10 @@ function filaProducto(p, catId){
 
 function leerFormulario(id){
   const precioVal = document.getElementById(`precio-${id}`).value;
+  const diasCheckboxes = document.querySelectorAll(`#dias-${id} input[type=checkbox]`);
+  const diasMarcados = Array.from(diasCheckboxes).filter(c => c.checked).map(c => parseInt(c.value));
+  const diasDisponible = diasMarcados.length === 7 ? null : diasMarcados; // 7 tildados = sin restricción
+
   return {
     nombre: document.getElementById(`nombre-${id}`).value.trim(),
     descripcion: document.getElementById(`desc-${id}`).value.trim(),
@@ -214,6 +229,7 @@ function leerFormulario(id){
     etiqueta: document.getElementById(`etq-${id}`).value || null,
     disponible: document.getElementById(`disp-${id}`).checked,
     destacado: document.getElementById(`dest-${id}`).checked,
+    dias_disponible: diasDisponible,
   };
 }
 
@@ -265,6 +281,7 @@ async function duplicarProducto(id){
     orden: p.orden,
     foto_url: p.foto_url,
     etiqueta: p.etiqueta,
+    dias_disponible: p.dias_disponible,
     disponible: false, // arranca oculta para que la revises antes de publicarla
     destacado: false,
   };

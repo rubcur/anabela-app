@@ -314,6 +314,7 @@ async function cargarCatalogo(){
   const minutosAhora = ahora.getHours()*60 + ahora.getMinutes();
   const esNoche = ahora.getHours() >= 17; // a partir de las 17hs se prioriza la carta de la tarde/noche
   const haceUnaSemanaMs = Date.now() - (7*24*60*60*1000);
+  const diaHoy = ahora.getDay(); // 0=domingo ... 6=sábado
 
   MENU = cats.map(cat => {
     let cerrado = false;
@@ -332,10 +333,15 @@ async function cargarCatalogo(){
         .filter(p => p.categoria_id === cat.id)
         .map(p => {
           const esNuevoAuto = !p.etiqueta && p.creado_en && new Date(p.creado_en).getTime() > haceUnaSemanaMs;
+          const noEsHoy = p.dias_disponible && p.dias_disponible.length > 0 && !p.dias_disponible.includes(diaHoy);
+          const diasTexto = noEsHoy
+            ? p.dias_disponible.map(d => NOMBRES_DIA[d].charAt(0).toUpperCase()+NOMBRES_DIA[d].slice(1)).join(" y ")
+            : "";
           return {
             nombre:p.nombre, desc:p.descripcion, precio:p.precio,
             destacado:p.destacado, foto:p.foto_url,
             etiqueta: p.etiqueta || (esNuevoAuto ? "nuevo" : null),
+            noEsHoy, diasTexto,
           };
         })
     };
@@ -401,6 +407,22 @@ function renderMenu(){
               <div class="cerrado-info">
                 <span class="cerrado-msg">🕚 Se pide<br>hasta las ${cat.horaLimiteTexto} hs</span>
                 <a class="consultar-stock" href="https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hola! Quería consultar si todavía tenés disponible: '+it.nombre)}" target="_blank">Consultar stock</a>
+              </div>
+            </div>
+          </div>`;
+        }
+        if(it.noEsHoy){
+          return `
+          <div class="item${claseDestacado}">
+            ${foto}
+            <div class="item-info">
+              <h3>${it.nombre}${badgeDestacado}${badgeEtiqueta}</h3>
+              <p>${it.desc}</p>
+            </div>
+            <div class="item-actions">
+              <div class="cerrado-info">
+                <span class="cerrado-msg">🗓️ Disponible<br>los ${it.diasTexto}</span>
+                <a class="consultar-stock" href="https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hola! Quería consultar por: '+it.nombre)}" target="_blank">Preguntar</a>
               </div>
             </div>
           </div>`;
