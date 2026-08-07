@@ -568,6 +568,38 @@ function actualizarLinkWhatsapp(total){
   document.getElementById("wspBtn").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
 }
 
+document.getElementById("wspBtn").addEventListener("click", async function(e){
+  e.preventDefault();
+  if(this.classList.contains("disabled")) return;
+
+  const urlDestino = this.href;
+  const total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
+  const nota = document.getElementById("nota").value.trim();
+
+  // Guardamos el pedido "a buena fe" — si esto falla (sin internet, etc.)
+  // el pedido real (el WhatsApp) tiene que salir igual, no se bloquea nunca.
+  try{
+    const { data: pedido, error } = await sb.from("pedidos").insert({
+      total, forma_pago: metodoPago, nota: nota || null,
+    }).select().single();
+
+    if(!error && pedido){
+      const items = Object.values(cart).map(it => ({
+        pedido_id: pedido.id,
+        nombre_producto: it.nombre,
+        cantidad: it.cant,
+        precio_unitario: it.precio,
+        subtotal: it.precio*it.cant,
+      }));
+      await sb.from("pedido_items").insert(items);
+    }
+  }catch(err){
+    // silencioso a propósito: nunca le mostramos un error de guardado al cliente
+  }
+
+  window.location.href = urlDestino;
+});
+
 document.getElementById("nota").addEventListener("input", ()=>{
   let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
   actualizarLinkWhatsapp(total);
