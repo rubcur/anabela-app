@@ -216,6 +216,18 @@
     .mobile-cart-bar.visible{ display:flex; }
   }
 
+  .metodo-lbl{
+    display:block; font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--oliva); margin-top:14px; margin-bottom:6px;
+  }
+  .metodo-row{ display:flex; gap:6px; margin-bottom:12px; }
+  .metodo-btn{
+    flex:1; background:var(--paper); border:1px solid var(--linea); border-radius:8px;
+    padding:8px 4px; font-family:'Karla',sans-serif; font-size:12px; text-align:center;
+    cursor:pointer; color:var(--ink); line-height:1.3;
+  }
+  .metodo-btn.active{ background:var(--oliva); border-color:var(--oliva); color:var(--paper-light); font-weight:700; }
+  .metodo-btn.disabled{ opacity:.5; cursor:not-allowed; color:#8a8574; }
   .pago-box{
     margin-top:16px; background:var(--paper); border:1px dashed var(--linea); border-radius:8px; padding:12px 14px;
   }
@@ -259,14 +271,26 @@
         </div>
         <textarea id="nota" placeholder="Aclaraciones (ej: sin sal, para las 20hs, piso 3 depto B...)"></textarea>
 
+        <label class="metodo-lbl">¿Cómo vas a pagar?</label>
+        <div class="metodo-row" id="metodoRow">
+          <button type="button" class="metodo-btn" data-metodo="efectivo" onclick="seleccionarMetodo('efectivo')">💵 Efectivo</button>
+          <button type="button" class="metodo-btn" data-metodo="transferencia" onclick="seleccionarMetodo('transferencia')">🏦 Transferencia</button>
+          <button type="button" class="metodo-btn disabled" disabled title="Muy pronto">💳 Mercado Pago<br><span style="font-size:9px;">(próximamente)</span></button>
+        </div>
+
         <a href="#" id="wspBtn" class="wsp-btn disabled">Enviar pedido por WhatsApp</a>
 
-        <div class="pago-box">
+        <div class="pago-box" id="pagoBoxTransferencia" style="display:none;">
           <div class="lbl">Transferencia</div>
           <div class="pago-row">
             <span class="val" id="aliasVal">anabela-pastas</span>
             <button class="copy-btn" onclick="copiarAlias(event)">Copiar</button>
           </div>
+        </div>
+
+        <div class="pago-box" id="pagoBoxEfectivo" style="display:none;">
+          <div class="lbl">Efectivo</div>
+          <p style="margin:6px 0 0; font-size:13px; color:#5a5648;">Pagás en efectivo al recibir tu pedido o al retirarlo por el local.</p>
         </div>
       </div>
     </div>
@@ -356,6 +380,18 @@ async function cargarCatalogo(){
 }
 
 let cart = {};
+let metodoPago = "transferencia"; // arranca en transferencia, como antes
+
+function seleccionarMetodo(m){
+  metodoPago = m;
+  document.querySelectorAll(".metodo-btn[data-metodo]").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.metodo === m);
+  });
+  document.getElementById("pagoBoxTransferencia").style.display = m==="transferencia" ? "block" : "none";
+  document.getElementById("pagoBoxEfectivo").style.display = m==="efectivo" ? "block" : "none";
+  let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
+  actualizarLinkWhatsapp(total);
+}
 let activeCat = "Todos";
 
 function renderCats(){
@@ -520,11 +556,13 @@ function quitar(key){ delete cart[key]; renderMenu(); renderComanda(); }
 
 function actualizarLinkWhatsapp(total){
   const nota = document.getElementById("nota").value.trim();
+  const textoMetodo = metodoPago === "efectivo" ? "Efectivo" : "Transferencia";
   let texto = "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
   Object.values(cart).forEach(it=>{
     texto += `• ${it.nombre} x${it.cant} — $${(it.precio*it.cant).toLocaleString('es-AR')}\n`;
   });
   texto += `\nTOTAL: $${total.toLocaleString('es-AR')}`;
+  texto += `\nForma de pago: ${textoMetodo}`;
   if(nota) texto += `\n\nAclaración: ${nota}`;
   texto += `\n\n(Pedido hecho desde la web)`;
   document.getElementById("wspBtn").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
@@ -597,6 +635,7 @@ function renderEstadoLocal(){
   el.innerHTML = `<span class="punto"></span>${texto}`;
 }
 
+seleccionarMetodo("transferencia");
 renderEstadoLocal();
 setInterval(renderEstadoLocal, 60000); // se actualiza solo cada un minuto
 
