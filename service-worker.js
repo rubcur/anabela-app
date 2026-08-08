@@ -1,4 +1,4 @@
-const CACHE_NAME = "anabela-pedidos-v1";
+const CACHE_NAME = "anabela-pedidos-v2";
 const ARCHIVOS_BASE = [
   "./",
   "./index.html",

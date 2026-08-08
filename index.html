@@ -576,14 +576,17 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
   const total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
   const nota = document.getElementById("nota").value.trim();
 
-  // Guardamos el pedido "a buena fe" — si esto falla (sin internet, etc.)
-  // el pedido real (el WhatsApp) tiene que salir igual, no se bloquea nunca.
+  // 🔧 MODO DIAGNÓSTICO TEMPORAL: si el guardado falla, se muestra el motivo
+  // en pantalla en vez de quedar en silencio. Sacar este bloque de alert()
+  // apenas encontremos la causa del problema.
   try{
     const { data: pedido, error } = await sb.from("pedidos").insert({
       total, forma_pago: metodoPago, nota: nota || null,
     }).select().single();
 
-    if(!error && pedido){
+    if(error){
+      alert("DIAGNÓSTICO — Error al guardar pedido:\n" + error.message + "\n\n(El pedido por WhatsApp va a salir igual)");
+    } else if(pedido){
       const items = Object.values(cart).map(it => ({
         pedido_id: pedido.id,
         nombre_producto: it.nombre,
@@ -591,10 +594,13 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
         precio_unitario: it.precio,
         subtotal: it.precio*it.cant,
       }));
-      await sb.from("pedido_items").insert(items);
+      const { error: errorItems } = await sb.from("pedido_items").insert(items);
+      if(errorItems){
+        alert("DIAGNÓSTICO — Pedido guardado, pero error en los ítems:\n" + errorItems.message);
+      }
     }
   }catch(err){
-    // silencioso a propósito: nunca le mostramos un error de guardado al cliente
+    alert("DIAGNÓSTICO — Excepción al guardar pedido:\n" + err.message);
   }
 
   window.location.href = urlDestino;
