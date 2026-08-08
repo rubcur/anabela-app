@@ -40,6 +40,24 @@
   header.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
 
   .cat-titulo{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; margin:26px 0 10px; display:flex; justify-content:space-between; align-items:center; }
+
+  .pedido-card{ background:var(--paper-light); border:1px solid var(--linea); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+  .pedido-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .pedido-hora{ font-family:'Space Mono',monospace; font-size:12px; color:var(--oliva); }
+  .pedido-total{ font-family:'Space Mono',monospace; font-weight:700; font-size:15px; color:var(--tomate); }
+  .pedido-items{ font-size:13px; color:#5a5648; margin-bottom:4px; line-height:1.5; }
+  .pedido-meta{ font-family:'Space Mono',monospace; font-size:11px; color:#8a8574; margin-bottom:10px; }
+  .pedido-meta b{ color:var(--ink); }
+  .estado-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  .estado-btn{
+    font-family:'Space Mono',monospace; font-size:11px; border:1px solid var(--linea); border-radius:99px;
+    padding:5px 12px; cursor:pointer; background:var(--paper); color:var(--ink);
+  }
+  .estado-btn.activo-pendiente{ background:#E3A73B; border-color:#E3A73B; color:var(--ink); font-weight:700; }
+  .estado-btn.activo-preparando{ background:#5B7B9C; border-color:#5B7B9C; color:#fff; font-weight:700; }
+  .estado-btn.activo-entregado{ background:var(--oliva); border-color:var(--oliva); color:#fff; font-weight:700; }
+  .estado-btn.activo-cancelado{ background:var(--tomate); border-color:var(--tomate); color:#fff; font-weight:700; }
+  .sin-pedidos{ text-align:center; padding:24px 0; color:#8a8574; font-family:'Space Mono',monospace; font-size:13px; }
   .fila{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .fila-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
   .check-row{ display:flex; gap:16px; align-items:center; font-size:13px; margin-bottom:10px; }
@@ -79,6 +97,13 @@
       <button class="btn-secundario" onclick="logout()">Salir</button>
     </header>
 
+    <div class="cat-titulo" style="margin-top:0;">
+      <span>📋 Pedidos de hoy <span id="contadorPedidos" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
+      <button class="btn-secundario" onclick="cargarPedidosHoy()">Actualizar</button>
+    </div>
+    <div id="pedidosHoy"></div>
+
+    <div class="cat-titulo" style="margin-top:34px;"><span>🍽️ Catálogo</span></div>
     <div id="loading">Cargando catálogo...</div>
     <div id="categorias"></div>
   </div>
@@ -114,7 +139,65 @@ async function logout(){
 async function mostrarApp(){
   document.getElementById("loginBox").style.display = "none";
   document.getElementById("appBox").style.display = "block";
+  await cargarPedidosHoy();
   await cargarTodo();
+}
+
+async function cargarPedidosHoy(){
+  const el = document.getElementById("pedidosHoy");
+  el.innerHTML = `<div class="sin-pedidos">Cargando pedidos...</div>`;
+
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0,0,0,0);
+
+  const { data: pedidos, error } = await sb
+    .from("pedidos")
+    .select("*, pedido_items(*)")
+    .gte("creado_en", inicioHoy.toISOString())
+    .order("creado_en", { ascending: false });
+
+  if(error){
+    el.innerHTML = `<div class="sin-pedidos">No se pudieron cargar los pedidos.</div>`;
+    return;
+  }
+
+  document.getElementById("contadorPedidos").textContent = pedidos.length ? `(${pedidos.length})` : "";
+
+  if(pedidos.length === 0){
+    el.innerHTML = `<div class="sin-pedidos">Todavía no hay pedidos hoy.</div>`;
+    return;
+  }
+
+  const ESTADOS = ["pendiente","preparando","entregado","cancelado"];
+  const ETIQUETA_ESTADO = { pendiente:"🟡 Pendiente", preparando:"🔵 Preparando", entregado:"🟢 Entregado", cancelado:"🔴 Cancelado" };
+
+  el.innerHTML = pedidos.map(ped => {
+    const hora = new Date(ped.creado_en).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+    const resumenItems = (ped.pedido_items||[])
+      .map(it => `${it.cantidad}x ${it.nombre_producto}`).join(", ");
+    const formaPago = ped.forma_pago ? ped.forma_pago.charAt(0).toUpperCase()+ped.forma_pago.slice(1) : "-";
+
+    const botones = ESTADOS.map(e =>
+      `<button class="estado-btn ${e===ped.estado?'activo-'+e:''}" onclick="cambiarEstadoPedido('${ped.id}','${e}')">${ETIQUETA_ESTADO[e]}</button>`
+    ).join("");
+
+    return `
+    <div class="pedido-card" id="pedido-${ped.id}">
+      <div class="pedido-top">
+        <span class="pedido-hora">${hora}</span>
+        <span class="pedido-total">$${Number(ped.total).toLocaleString('es-AR')}</span>
+      </div>
+      <div class="pedido-items">${resumenItems}</div>
+      <div class="pedido-meta">Pago: <b>${formaPago}</b>${ped.nota ? ` · Nota: ${ped.nota}` : ""}</div>
+      <div class="estado-row">${botones}</div>
+    </div>`;
+  }).join("");
+}
+
+async function cambiarEstadoPedido(id, nuevoEstado){
+  const { error } = await sb.from("pedidos").update({ estado: nuevoEstado }).eq("id", id);
+  if(error){ alert("No se pudo actualizar el estado: " + error.message); return; }
+  await cargarPedidosHoy();
 }
 
 async function cargarTodo(){
