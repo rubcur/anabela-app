@@ -103,6 +103,20 @@
     </div>
     <div id="pedidosHoy"></div>
 
+    <div class="cat-titulo" style="margin-top:34px;">
+      <span>⭐ Clientes <span id="contadorClientes" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
+      <button class="btn-secundario" onclick="cargarClientes()">Actualizar</button>
+    </div>
+    <div class="sub" style="margin-top:-4px;">Se cuenta como "⭐ Frecuente" desde el 3er pedido</div>
+    <div id="clientesLista"></div>
+
+    <div class="cat-titulo" style="margin-top:34px;">
+      <span>📜 Historial de pedidos</span>
+      <button class="btn-secundario" onclick="cargarHistorial()">Actualizar</button>
+    </div>
+    <input type="text" id="buscarTelefono" placeholder="Buscar por teléfono..." oninput="filtrarHistorial()">
+    <div id="historialPedidos"></div>
+
     <div class="cat-titulo" style="margin-top:34px;"><span>🍽️ Catálogo</span></div>
     <div id="loading">Cargando catálogo...</div>
     <div id="categorias"></div>
@@ -140,6 +154,8 @@ async function mostrarApp(){
   document.getElementById("loginBox").style.display = "none";
   document.getElementById("appBox").style.display = "block";
   await cargarPedidosHoy();
+  await cargarClientes();
+  await cargarHistorial();
   await cargarTodo();
 }
 
@@ -198,6 +214,96 @@ async function cambiarEstadoPedido(id, nuevoEstado){
   const { error } = await sb.from("pedidos").update({ estado: nuevoEstado }).eq("id", id);
   if(error){ alert("No se pudo actualizar el estado: " + error.message); return; }
   await cargarPedidosHoy();
+}
+
+// ---- Clientes (se llenan solos desde cada pedido, vía upsert_cliente) ----
+async function cargarClientes(){
+  const el = document.getElementById("clientesLista");
+  el.innerHTML = `<div class="sin-pedidos">Cargando clientes...</div>`;
+
+  const { data: clientes, error } = await sb
+    .from("clientes")
+    .select("*")
+    .order("cantidad_pedidos", { ascending: false })
+    .limit(150);
+
+  if(error){
+    el.innerHTML = `<div class="sin-pedidos">No se pudo cargar la lista de clientes. (¿Ya corriste agregar_clientes.sql?)</div>`;
+    return;
+  }
+
+  document.getElementById("contadorClientes").textContent = clientes.length ? `(${clientes.length})` : "";
+
+  if(clientes.length === 0){
+    el.innerHTML = `<div class="sin-pedidos">Todavía no hay clientes registrados. Van a aparecer solos a medida que lleguen pedidos.</div>`;
+    return;
+  }
+
+  el.innerHTML = clientes.map(c => {
+    const frecuente = c.cantidad_pedidos >= 3;
+    const ultimo = new Date(c.fecha_ultimo_pedido).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+    return `
+    <div class="pedido-card">
+      <div class="pedido-top">
+        <span class="pedido-hora">📱 ${escapeHtml(c.telefono)}${frecuente ? ' &nbsp;⭐ Frecuente' : ''}</span>
+        <span class="pedido-total">$${Number(c.total_gastado).toLocaleString('es-AR')}</span>
+      </div>
+      <div class="pedido-meta">${c.cantidad_pedidos} pedido${c.cantidad_pedidos===1?'':'s'} · Último: ${ultimo}${c.nombre ? ' · '+escapeHtml(c.nombre) : ''}</div>
+    </div>`;
+  }).join("");
+}
+
+// ---- Historial de pedidos (todos, con búsqueda por teléfono) ----
+let historialCache = [];
+
+async function cargarHistorial(){
+  const el = document.getElementById("historialPedidos");
+  el.innerHTML = `<div class="sin-pedidos">Cargando historial...</div>`;
+
+  const { data: pedidos, error } = await sb
+    .from("pedidos")
+    .select("*, pedido_items(*)")
+    .order("creado_en", { ascending: false })
+    .limit(200);
+
+  if(error){
+    el.innerHTML = `<div class="sin-pedidos">No se pudo cargar el historial.</div>`;
+    return;
+  }
+  historialCache = pedidos;
+  renderHistorial(pedidos);
+}
+
+function renderHistorial(pedidos){
+  const el = document.getElementById("historialPedidos");
+  if(pedidos.length === 0){
+    el.innerHTML = `<div class="sin-pedidos">No hay pedidos que coincidan.</div>`;
+    return;
+  }
+  const ETIQUETA_ESTADO = { pendiente:"🟡 Pendiente", preparando:"🔵 Preparando", entregado:"🟢 Entregado", cancelado:"🔴 Cancelado" };
+  el.innerHTML = pedidos.map(ped => {
+    const fecha = new Date(ped.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'});
+    const hora = new Date(ped.creado_en).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+    const resumenItems = (ped.pedido_items||[]).map(it => `${it.cantidad}x ${it.nombre_producto}`).join(", ");
+    const formaPago = ped.forma_pago ? ped.forma_pago.charAt(0).toUpperCase()+ped.forma_pago.slice(1) : "-";
+    const etiquetaEstado = ETIQUETA_ESTADO[ped.estado] || ped.estado || "";
+    return `
+    <div class="pedido-card">
+      <div class="pedido-top">
+        <span class="pedido-hora">${fecha} · ${hora}</span>
+        <span class="pedido-total">$${Number(ped.total).toLocaleString('es-AR')}</span>
+      </div>
+      <div class="pedido-items">${resumenItems}</div>
+      <div class="pedido-meta">📱 ${ped.telefono ? escapeHtml(ped.telefono) : 'sin teléfono'} · Pago: <b>${formaPago}</b> · ${etiquetaEstado}</div>
+    </div>`;
+  }).join("");
+}
+
+function filtrarHistorial(){
+  const q = document.getElementById("buscarTelefono").value.trim();
+  if(!q){ renderHistorial(historialCache); return; }
+  const filtrados = historialCache.filter(p => (p.telefono||"").includes(q));
+  renderHistorial(filtrados);
 }
 
 async function cargarTodo(){
