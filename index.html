@@ -275,7 +275,7 @@
         <div class="metodo-row" id="metodoRow">
           <button type="button" class="metodo-btn" data-metodo="efectivo" onclick="seleccionarMetodo('efectivo')">💵 Efectivo</button>
           <button type="button" class="metodo-btn" data-metodo="transferencia" onclick="seleccionarMetodo('transferencia')">🏦 Transferencia</button>
-          <button type="button" class="metodo-btn disabled" disabled title="Muy pronto">💳 Mercado Pago<br><span style="font-size:9px;">(próximamente)</span></button>
+          <button type="button" class="metodo-btn" data-metodo="mercadopago" onclick="seleccionarMetodo('mercadopago')">💳 Mercado Pago</button>
         </div>
 
         <a href="#" id="wspBtn" class="wsp-btn disabled">Enviar pedido por WhatsApp</a>
@@ -291,6 +291,14 @@
         <div class="pago-box" id="pagoBoxEfectivo" style="display:none;">
           <div class="lbl">Efectivo</div>
           <p style="margin:6px 0 0; font-size:13px; color:#5a5648;">Pagás en efectivo al recibir tu pedido o al retirarlo por el local.</p>
+        </div>
+
+        <div class="pago-box" id="pagoBoxMercadoPago" style="display:none;">
+          <div class="lbl">Mercado Pago</div>
+          <div class="pago-row">
+            <span class="val" id="aliasMPVal">anabelacocina</span>
+            <button class="copy-btn" onclick="copiarAliasMP(event)">Copiar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -309,6 +317,7 @@
 <script>
 const WHATSAPP_NUMBER = "5492262475144";
 const ALIAS = "anabela-pastas";
+const ALIAS_MP = "anabelacocina";
 
 // 👉 COMPLETAR después de crear el proyecto en Supabase (Project Settings → API)
 const SUPABASE_URL = "https://fgpsalshmoqvnqprbqwa.supabase.co";
@@ -389,6 +398,7 @@ function seleccionarMetodo(m){
   });
   document.getElementById("pagoBoxTransferencia").style.display = m==="transferencia" ? "block" : "none";
   document.getElementById("pagoBoxEfectivo").style.display = m==="efectivo" ? "block" : "none";
+  document.getElementById("pagoBoxMercadoPago").style.display = m==="mercadopago" ? "block" : "none";
   let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
   actualizarLinkWhatsapp(total);
 }
@@ -556,7 +566,7 @@ function quitar(key){ delete cart[key]; renderMenu(); renderComanda(); }
 
 function actualizarLinkWhatsapp(total){
   const nota = document.getElementById("nota").value.trim();
-  const textoMetodo = metodoPago === "efectivo" ? "Efectivo" : "Transferencia";
+  const textoMetodo = metodoPago === "efectivo" ? "Efectivo" : (metodoPago === "mercadopago" ? "Mercado Pago" : "Transferencia");
   let texto = "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
   Object.values(cart).forEach(it=>{
     texto += `• ${it.nombre} x${it.cant} — $${(it.precio*it.cant).toLocaleString('es-AR')}\n`;
@@ -576,31 +586,28 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
   const total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
   const nota = document.getElementById("nota").value.trim();
 
-  // 🔧 MODO DIAGNÓSTICO TEMPORAL: si el guardado falla, se muestra el motivo
-  // en pantalla en vez de quedar en silencio. Sacar este bloque de alert()
-  // apenas encontremos la causa del problema.
+  // Guardado silencioso: si falla, el pedido sale por WhatsApp igual.
   try{
-    const { data: pedido, error } = await sb.from("pedidos").insert({
-      total, forma_pago: metodoPago, nota: nota || null,
-    }).select().single();
+    const pedidoId = (crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(16).slice(2));
 
-    if(error){
-      alert("DIAGNÓSTICO — Error al guardar pedido:\n" + error.message + "\n\n(El pedido por WhatsApp va a salir igual)");
-    } else if(pedido){
+    const { error } = await sb.from("pedidos").insert({
+      id: pedidoId, total, forma_pago: metodoPago, nota: nota || null,
+    });
+
+    if(!error){
       const items = Object.values(cart).map(it => ({
-        pedido_id: pedido.id,
+        pedido_id: pedidoId,
         nombre_producto: it.nombre,
         cantidad: it.cant,
         precio_unitario: it.precio,
         subtotal: it.precio*it.cant,
       }));
-      const { error: errorItems } = await sb.from("pedido_items").insert(items);
-      if(errorItems){
-        alert("DIAGNÓSTICO — Pedido guardado, pero error en los ítems:\n" + errorItems.message);
-      }
+      await sb.from("pedido_items").insert(items);
+    } else {
+      console.warn("No se pudo guardar el pedido en Supabase:", error.message);
     }
   }catch(err){
-    alert("DIAGNÓSTICO — Excepción al guardar pedido:\n" + err.message);
+    console.warn("Excepción al guardar pedido:", err.message);
   }
 
   window.location.href = urlDestino;
@@ -622,6 +629,18 @@ function copiarAlias(e){
 }
 
 document.getElementById("aliasVal").textContent = ALIAS;
+
+function copiarAliasMP(e){
+  navigator.clipboard.writeText(ALIAS_MP).then(()=>{
+    const btn = e.target;
+    const old = btn.textContent;
+    btn.textContent = "¡Copiado!";
+    btn.classList.add("ok");
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove("ok"); }, 1600);
+  });
+}
+
+document.getElementById("aliasMPVal").textContent = ALIAS_MP;
 
 // Horarios reales del local. Formato: [hora_inicio*60, hora_fin*60] en minutos.
 // getDay(): 0=domingo, 1=lunes, 2=martes, 3=miércoles, 4=jueves, 5=viernes, 6=sábado
