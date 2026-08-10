@@ -285,9 +285,11 @@
         <div class="tel-box" id="telBox">
           <label class="metodo-lbl" id="telLabel">📱 Tu WhatsApp (por si hay alguna duda con el pedido)</label>
           <input type="tel" id="telInput" placeholder="Ej: 2262 555 0123" inputmode="tel">
-          <div class="tel-hint" id="telHint">Lo guardamos en este celular para no pedírtelo de nuevo.</div>
+          <label class="metodo-lbl" id="nombreLabel" style="margin-top:8px;">Tu nombre (opcional)</label>
+          <input type="text" id="nombreInput" placeholder="Ej: Rubén">
+          <div class="tel-hint" id="telHint">Así podemos dirigirnos a vos cuando preparemos tu pedido. Lo guardamos en este celular para no pedírtelo de nuevo.</div>
           <div class="tel-guardado" id="telGuardado" style="display:none;">
-            <span>📱 Te avisamos al <b id="telGuardadoVal"></b></span>
+            <span id="telGuardadoTexto"></span>
             <a href="#" onclick="cambiarTelefono(event)">Cambiar</a>
           </div>
           <div class="tel-error" id="telError" style="display:none;">Necesitamos tu WhatsApp para poder enviar el pedido.</div>
@@ -589,7 +591,10 @@ function quitar(key){ delete cart[key]; renderMenu(); renderComanda(); }
 function actualizarLinkWhatsapp(total){
   const nota = document.getElementById("nota").value.trim();
   const textoMetodo = metodoPago === "efectivo" ? "Efectivo" : (metodoPago === "mercadopago" ? "Mercado Pago" : "Transferencia");
-  let texto = "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
+  const nombreCliente = obtenerNombre();
+  let texto = nombreCliente
+    ? `Hola! Soy ${nombreCliente}, quiero hacer este pedido a Anabela Cocina Casera:\n\n`
+    : "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
   Object.values(cart).forEach(it=>{
     texto += `• ${it.nombre} x${it.cant} — $${(it.precio*it.cant).toLocaleString('es-AR')}\n`;
   });
@@ -605,6 +610,7 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
   if(this.classList.contains("disabled")) return;
 
   const telefono = obtenerTelefono();
+  const nombreCliente = obtenerNombre();
   if(!telefono){
     document.getElementById("telError").style.display = "block";
     document.getElementById("telInput").focus();
@@ -612,7 +618,8 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
   }
   document.getElementById("telError").style.display = "none";
   localStorage.setItem(TEL_KEY, telefono);
-  mostrarTelGuardado(telefono);
+  if(nombreCliente) localStorage.setItem(NOMBRE_KEY, nombreCliente);
+  mostrarTelGuardado(telefono, nombreCliente || localStorage.getItem(NOMBRE_KEY));
 
   const urlDestino = this.href;
   const total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
@@ -623,7 +630,8 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
     const pedidoId = (crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(16).slice(2));
 
     const { error } = await sb.from("pedidos").insert({
-      id: pedidoId, total, forma_pago: metodoPago, nota: nota || null, telefono,
+      id: pedidoId, total, forma_pago: metodoPago, nota: nota || null,
+      telefono, nombre_cliente: nombreCliente || null,
     });
 
     if(!error){
@@ -637,7 +645,7 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
       await sb.from("pedido_items").insert(items);
 
       // Registra/actualiza al cliente por su WhatsApp (silencioso, no bloquea el pedido).
-      sb.rpc("upsert_cliente", { p_telefono: telefono, p_nombre: null, p_monto: total }).catch(()=>{});
+      sb.rpc("upsert_cliente", { p_telefono: telefono, p_nombre: nombreCliente || null, p_monto: total }).catch(()=>{});
     } else {
       console.warn("No se pudo guardar el pedido en Supabase:", error.message);
     }
@@ -649,6 +657,11 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
 });
 
 document.getElementById("nota").addEventListener("input", ()=>{
+  let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
+  actualizarLinkWhatsapp(total);
+});
+
+document.getElementById("nombreInput").addEventListener("input", ()=>{
   let total = Object.values(cart).reduce((s,it)=>s+it.precio*it.cant,0);
   actualizarLinkWhatsapp(total);
 });
@@ -727,30 +740,40 @@ function renderEstadoLocal(){
   el.innerHTML = `<span class="punto"></span>${texto}`;
 }
 
-// ---- Teléfono del cliente: se pide una sola vez, se recuerda siempre ----
+// ---- Teléfono y nombre del cliente: se pide una sola vez, se recuerda siempre ----
 const TEL_KEY = "anabela_telefono";
+const NOMBRE_KEY = "anabela_nombre";
 
 function initTelefono(){
-  const guardado = localStorage.getItem(TEL_KEY);
-  if(guardado){
-    mostrarTelGuardado(guardado);
+  const telGuardado = localStorage.getItem(TEL_KEY);
+  const nombreGuardado = localStorage.getItem(NOMBRE_KEY);
+  if(telGuardado){
+    mostrarTelGuardado(telGuardado, nombreGuardado);
   }
 }
 
-function mostrarTelGuardado(numero){
+function mostrarTelGuardado(numero, nombre){
   document.getElementById("telInput").style.display = "none";
+  document.getElementById("nombreLabel").style.display = "none";
+  document.getElementById("nombreInput").style.display = "none";
   document.getElementById("telHint").style.display = "none";
   document.getElementById("telGuardado").style.display = "flex";
-  document.getElementById("telGuardadoVal").textContent = numero;
+  document.getElementById("telGuardadoTexto").textContent = nombre
+    ? `¡Qué bueno verte de nuevo, ${nombre}! 👋`
+    : `📱 Te avisamos al ${numero}`;
 }
 
 function cambiarTelefono(e){
   e.preventDefault();
   document.getElementById("telGuardado").style.display = "none";
   const input = document.getElementById("telInput");
+  const nombreInput = document.getElementById("nombreInput");
   input.style.display = "block";
+  document.getElementById("nombreLabel").style.display = "block";
+  nombreInput.style.display = "block";
   document.getElementById("telHint").style.display = "block";
   input.value = localStorage.getItem(TEL_KEY) || "";
+  nombreInput.value = localStorage.getItem(NOMBRE_KEY) || "";
   input.focus();
 }
 
@@ -758,6 +781,12 @@ function obtenerTelefono(){
   const guardadoVisible = document.getElementById("telGuardado").style.display === "flex";
   if(guardadoVisible) return localStorage.getItem(TEL_KEY) || "";
   return document.getElementById("telInput").value.trim();
+}
+
+function obtenerNombre(){
+  const guardadoVisible = document.getElementById("telGuardado").style.display === "flex";
+  if(guardadoVisible) return localStorage.getItem(NOMBRE_KEY) || "";
+  return document.getElementById("nombreInput").value.trim();
 }
 
 initTelefono();

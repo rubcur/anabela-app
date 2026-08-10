@@ -39,6 +39,18 @@
 
   header.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
 
+  .tabs-bar{
+    display:flex; gap:6px; margin-bottom:24px; overflow-x:auto; padding-bottom:2px;
+    border-bottom:1px solid var(--linea);
+  }
+  .tab-btn{
+    background:none; border:none; color:#8a8574; font-family:'Space Mono',monospace;
+    font-size:12px; text-transform:uppercase; letter-spacing:.03em; padding:10px 12px;
+    cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; border-radius:0;
+  }
+  .tab-btn.active{ color:var(--oliva); border-bottom-color:var(--oliva); font-weight:700; }
+
+
   .cat-titulo{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; margin:26px 0 10px; display:flex; justify-content:space-between; align-items:center; }
 
   .pedido-card{ background:var(--paper-light); border:1px solid var(--linea); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
@@ -91,36 +103,52 @@
   <div id="appBox" style="display:none;">
     <header class="topbar">
       <div>
-        <h1>Catálogo</h1>
-        <div class="sub">Anabela Cocina Casera — /admin</div>
+        <h1>Anabela — Admin</h1>
+        <div class="sub">Anabela Cocina Casera</div>
       </div>
       <button class="btn-secundario" onclick="logout()">Salir</button>
     </header>
 
-    <div class="cat-titulo" style="margin-top:0;">
-      <span>📋 Pedidos de hoy <span id="contadorPedidos" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
-      <button class="btn-secundario" onclick="cargarPedidosHoy()">Actualizar</button>
+    <div class="tabs-bar" id="tabsBar">
+      <button class="tab-btn active" data-tab="pedidos" onclick="mostrarTab('pedidos')">📋 Pedidos de hoy</button>
+      <button class="tab-btn" data-tab="clientes" onclick="mostrarTab('clientes')">⭐ Clientes</button>
+      <button class="tab-btn" data-tab="historial" onclick="mostrarTab('historial')">📜 Historial</button>
+      <button class="tab-btn" data-tab="catalogo" onclick="mostrarTab('catalogo')">🍽️ Catálogo</button>
     </div>
-    <div id="pedidosHoy"></div>
 
-    <div class="cat-titulo" style="margin-top:34px;">
-      <span>⭐ Clientes <span id="contadorClientes" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
-      <button class="btn-secundario" onclick="cargarClientes()">Actualizar</button>
+    <div class="tab-panel" id="tab-pedidos">
+      <div class="cat-titulo" style="margin-top:0;">
+        <span>📋 Pedidos de hoy <span id="contadorPedidos" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
+        <button class="btn-secundario" onclick="cargarPedidosHoy()">Actualizar</button>
+      </div>
+      <div id="pedidosHoy"></div>
     </div>
-    <div class="sub" style="margin-top:-4px;">Se cuenta como "⭐ Frecuente" desde el 3er pedido</div>
-    <div id="clientesLista"></div>
 
-    <div class="cat-titulo" style="margin-top:34px;">
-      <span>📜 Historial de pedidos</span>
-      <button class="btn-secundario" onclick="cargarHistorial()">Actualizar</button>
+    <div class="tab-panel" id="tab-clientes" style="display:none;">
+      <div class="cat-titulo" style="margin-top:0;">
+        <span>⭐ Clientes <span id="contadorClientes" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
+        <button class="btn-secundario" onclick="cargarClientes()">Actualizar</button>
+      </div>
+      <div class="sub" style="margin-top:-4px;">Se cuenta como "⭐ Frecuente" desde el 3er pedido</div>
+      <div id="clientesLista"></div>
     </div>
-    <input type="text" id="buscarTelefono" placeholder="Buscar por teléfono..." oninput="filtrarHistorial()">
-    <div id="historialPedidos"></div>
 
-    <div class="cat-titulo" style="margin-top:34px;"><span>🍽️ Catálogo</span></div>
-    <div id="loading">Cargando catálogo...</div>
-    <div id="categorias"></div>
+    <div class="tab-panel" id="tab-historial" style="display:none;">
+      <div class="cat-titulo" style="margin-top:0;">
+        <span>📜 Historial de pedidos</span>
+        <button class="btn-secundario" onclick="cargarHistorial()">Actualizar</button>
+      </div>
+      <input type="text" id="buscarTelefono" placeholder="Buscar por teléfono..." oninput="filtrarHistorial()">
+      <div id="historialPedidos"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-catalogo" style="display:none;">
+      <div class="cat-titulo" style="margin-top:0;"><span>🍽️ Catálogo</span></div>
+      <div id="loading">Cargando catálogo...</div>
+      <div id="categorias"></div>
+    </div>
   </div>
+
 
 </div>
 
@@ -148,6 +176,15 @@ async function logout(){
   await sb.auth.signOut();
   document.getElementById("appBox").style.display = "none";
   document.getElementById("loginBox").style.display = "block";
+}
+
+function mostrarTab(nombre){
+  ["pedidos","clientes","historial","catalogo"].forEach(t=>{
+    document.getElementById("tab-"+t).style.display = (t===nombre) ? "block" : "none";
+  });
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.tab === nombre);
+  });
 }
 
 async function mostrarApp(){
