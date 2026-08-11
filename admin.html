@@ -112,6 +112,7 @@
     <div class="tabs-bar" id="tabsBar">
       <button class="tab-btn active" data-tab="pedidos" onclick="mostrarTab('pedidos')">📋 Pedidos de hoy</button>
       <button class="tab-btn" data-tab="clientes" onclick="mostrarTab('clientes')">⭐ Clientes</button>
+      <button class="tab-btn" data-tab="puntos" onclick="mostrarTab('puntos')">🎯 Puntos</button>
       <button class="tab-btn" data-tab="historial" onclick="mostrarTab('historial')">📜 Historial</button>
       <button class="tab-btn" data-tab="catalogo" onclick="mostrarTab('catalogo')">🍽️ Catálogo</button>
     </div>
@@ -129,8 +130,36 @@
         <span>⭐ Clientes <span id="contadorClientes" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--oliva);"></span></span>
         <button class="btn-secundario" onclick="cargarClientes()">Actualizar</button>
       </div>
-      <div class="sub" style="margin-top:-4px;">Se cuenta como "⭐ Frecuente" desde el 3er pedido</div>
+      <div class="sub" style="margin-top:-4px;">"⭐ Frecuente" desde el 3er pedido · "👋 No volvió" si compró 1 vez y hace +7 días que no vuelve</div>
       <div id="clientesLista"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-puntos" style="display:none;">
+      <div class="cat-titulo" style="margin-top:0;">
+        <span>🎯 Reglas de puntos</span>
+        <button class="btn-secundario" onclick="cargarReglasPuntos()">Actualizar</button>
+      </div>
+      <div class="sub" style="margin-top:-4px;">Cambiá estos valores cuando quieras — no hace falta tocar código.</div>
+      <div id="reglasPuntosLista"></div>
+
+      <div class="cat-titulo" style="margin-top:30px;"><span>✋ Otorgar puntos a mano</span></div>
+      <div class="sub" style="margin-top:-4px;">Para acciones manuales como "respondió una pregunta" o "recomendó a un amigo", o para ajustar puntos de un cliente puntual.</div>
+      <div class="pedido-card">
+        <input type="tel" id="manualTelefono" placeholder="Teléfono del cliente" style="margin-bottom:8px;">
+        <select id="manualAccion" style="width:100%; padding:10px 12px; border:1px solid var(--linea); border-radius:8px; font-family:'Space Mono',monospace; font-size:13px; margin-bottom:8px; background:var(--paper-light);">
+          <option value="responder_pregunta">💬 Respondió una pregunta</option>
+          <option value="referido">🤝 Recomendó a un amigo</option>
+        </select>
+        <button class="btn-secundario" onclick="otorgarPuntosManual()" style="width:100%;">Otorgar</button>
+      </div>
+
+      <div class="cat-titulo" style="margin-top:30px;"><span>✏️ Ajuste manual (+ / −)</span></div>
+      <div class="pedido-card">
+        <input type="tel" id="ajusteTelefono" placeholder="Teléfono del cliente" style="margin-bottom:8px;">
+        <input type="number" id="ajustePuntos" placeholder="Ej: 10 o -5" style="margin-bottom:8px;">
+        <input type="text" id="ajusteMotivo" placeholder="Motivo (obligatorio)" style="margin-bottom:8px;">
+        <button class="btn-secundario" onclick="ajustarPuntosManualUI()" style="width:100%;">Aplicar ajuste</button>
+      </div>
     </div>
 
     <div class="tab-panel" id="tab-historial" style="display:none;">
@@ -179,12 +208,13 @@ async function logout(){
 }
 
 function mostrarTab(nombre){
-  ["pedidos","clientes","historial","catalogo"].forEach(t=>{
+  ["pedidos","clientes","puntos","historial","catalogo"].forEach(t=>{
     document.getElementById("tab-"+t).style.display = (t===nombre) ? "block" : "none";
   });
   document.querySelectorAll(".tab-btn").forEach(btn=>{
     btn.classList.toggle("active", btn.dataset.tab === nombre);
   });
+  if(nombre === "puntos") cargarReglasPuntos();
 }
 
 async function mostrarApp(){
@@ -278,14 +308,19 @@ async function cargarClientes(){
 
   el.innerHTML = clientes.map(c => {
     const frecuente = c.cantidad_pedidos >= 3;
+    const diasDesdeUltimo = (Date.now() - new Date(c.fecha_ultimo_pedido).getTime()) / 86400000;
+    const noVolvio = c.cantidad_pedidos === 1 && diasDesdeUltimo > 7;
     const ultimo = new Date(c.fecha_ultimo_pedido).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+    let badge = "";
+    if(frecuente) badge = ' &nbsp;⭐ Frecuente';
+    else if(noVolvio) badge = ' &nbsp;👋 No volvió';
     return `
     <div class="pedido-card">
       <div class="pedido-top">
-        <span class="pedido-hora">📱 ${escapeHtml(c.telefono)}${frecuente ? ' &nbsp;⭐ Frecuente' : ''}</span>
+        <span class="pedido-hora">📱 ${escapeHtml(c.telefono)}${badge}</span>
         <span class="pedido-total">$${Number(c.total_gastado).toLocaleString('es-AR')}</span>
       </div>
-      <div class="pedido-meta">${c.cantidad_pedidos} pedido${c.cantidad_pedidos===1?'':'s'} · Último: ${ultimo}${c.nombre ? ' · '+escapeHtml(c.nombre) : ''}</div>
+      <div class="pedido-meta">${c.cantidad_pedidos} pedido${c.cantidad_pedidos===1?'':'s'} · Último: ${ultimo}${c.nombre ? ' · '+escapeHtml(c.nombre) : ''} · 🎯 ${c.puntos_actuales||0} puntos</div>
     </div>`;
   }).join("");
 }
@@ -341,6 +376,79 @@ function filtrarHistorial(){
   if(!q){ renderHistorial(historialCache); return; }
   const filtrados = historialCache.filter(p => (p.telefono||"").includes(q));
   renderHistorial(filtrados);
+}
+
+// ---- Puntos: reglas editables + acciones manuales ----
+async function cargarReglasPuntos(){
+  const el = document.getElementById("reglasPuntosLista");
+  el.innerHTML = `<div class="sin-pedidos">Cargando reglas...</div>`;
+
+  const { data: reglas, error } = await sb
+    .from("reglas_puntos")
+    .select("*")
+    .order("automatica", { ascending: false });
+
+  if(error){
+    el.innerHTML = `<div class="sin-pedidos">No se pudo cargar. (¿Ya corriste agregar_puntos.sql?)</div>`;
+    return;
+  }
+
+  el.innerHTML = reglas.map(r => `
+    <div class="pedido-card">
+      <div class="pedido-top">
+        <span class="pedido-hora">${escapeHtml(r.descripcion || r.accion)}</span>
+      </div>
+      <div class="pedido-meta">${r.automatica ? "⚙️ automática" : "✋ solo manual"}</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+        <input type="number" id="reglaPts-${r.accion}" value="${r.puntos}" style="width:80px; margin:0;">
+        <label style="display:flex; align-items:center; gap:5px; font-size:12.5px; font-family:'Space Mono',monospace;">
+          <input type="checkbox" id="reglaActiva-${r.accion}" ${r.activo ? "checked" : ""} style="width:auto;"> activa
+        </label>
+        <button class="btn-secundario" style="margin-left:auto; padding:8px 14px;" onclick="guardarReglaPuntos('${r.accion}')">Guardar</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function guardarReglaPuntos(accion){
+  const puntos = parseInt(document.getElementById(`reglaPts-${accion}`).value, 10) || 0;
+  const activo = document.getElementById(`reglaActiva-${accion}`).checked;
+  const { error } = await sb.from("reglas_puntos")
+    .update({ puntos, activo, actualizado_en: new Date().toISOString() })
+    .eq("accion", accion);
+  if(error){ alert("No se pudo guardar: " + error.message); return; }
+  alert("Guardado ✓");
+}
+
+async function otorgarPuntosManual(){
+  const telefono = document.getElementById("manualTelefono").value.trim();
+  const accion = document.getElementById("manualAccion").value;
+  if(!telefono){ alert("Escribí el teléfono del cliente."); return; }
+
+  const { error } = await sb.rpc("otorgar_puntos", { p_telefono: telefono, p_accion: accion, p_pedido_id: null, p_motivo: null });
+  if(error){ alert("No se pudo otorgar: " + error.message); return; }
+  alert("Puntos otorgados ✓");
+  document.getElementById("manualTelefono").value = "";
+  await cargarClientes();
+}
+
+async function ajustarPuntosManualUI(){
+  const telefono = document.getElementById("ajusteTelefono").value.trim();
+  const puntos = parseInt(document.getElementById("ajustePuntos").value, 10);
+  const motivo = document.getElementById("ajusteMotivo").value.trim();
+
+  if(!telefono || isNaN(puntos) || !motivo){
+    alert("Completá teléfono, puntos (número) y motivo.");
+    return;
+  }
+
+  const { error } = await sb.rpc("ajustar_puntos_manual", { p_telefono: telefono, p_puntos: puntos, p_motivo: motivo });
+  if(error){ alert("No se pudo ajustar: " + error.message); return; }
+  alert("Ajuste aplicado ✓");
+  document.getElementById("ajusteTelefono").value = "";
+  document.getElementById("ajustePuntos").value = "";
+  document.getElementById("ajusteMotivo").value = "";
+  await cargarClientes();
 }
 
 async function cargarTodo(){
