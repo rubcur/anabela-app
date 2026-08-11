@@ -679,9 +679,13 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
       }));
       await sb.from("pedido_items").insert(items);
 
-      // Registra/actualiza al cliente por su WhatsApp (silencioso, no bloquea el pedido).
-      sb.rpc("upsert_cliente", { p_telefono: telefono, p_nombre: nombreCliente || null, p_monto: total }).catch(()=>{});
-      sb.rpc("otorgar_puntos_pedido", { p_telefono: telefono, p_pedido_id: pedidoId }).catch(()=>{});
+      // Cliente y puntos: no bloquean el envío del pedido por WhatsApp si fallan,
+      // pero corren EN ORDEN (uno espera al otro) y cualquier error se ve en consola.
+      const { error: errCliente } = await sb.rpc("upsert_cliente", { p_telefono: telefono, p_nombre: nombreCliente || null, p_monto: total });
+      if(errCliente) console.error("upsert_cliente falló:", errCliente.message);
+
+      const { error: errPuntos } = await sb.rpc("otorgar_puntos_pedido", { p_telefono: telefono, p_pedido_id: pedidoId });
+      if(errPuntos) console.error("otorgar_puntos_pedido falló:", errPuntos.message);
     } else {
       console.warn("No se pudo guardar el pedido en Supabase:", error.message);
     }
