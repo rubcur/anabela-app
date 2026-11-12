@@ -14,7 +14,7 @@ input,select{width:100%;padding:10px;margin:4px 0;border:1px solid #d9ccb2;borde
 </style></head><body><div id="app"></div>
 <script>
 const U='https://fgpsalshmoqvnqprbqwa.supabase.co',K='sb_publishable__SK88T24ydiEckyZa937ow_woYl0UTj';
-let S=JSON.parse(localStorage.pos||'null'),prods=[],stock=[],cart=[],tab='v',cort=false;
+let S=JSON.parse(localStorage.pos||'null'),prods=[],all=[],stock=[],cart=[],tab='v',cort=false;
 const F={canal:'mostrador',pago:'Efectivo',n:'',w:''};
 const $=id=>document.getElementById(id),app=$('app');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -22,12 +22,12 @@ const $$=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const st=p=>/kilo/i.test(p.nombre)?.5:1;
 async function auth(body,g){const r=await fetch(U+'/auth/v1/token?grant_type='+g,{method:'POST',headers:{apikey:K,'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error_description||j.msg||'Error de acceso');S={t:j.access_token,r:j.refresh_token,e:j.user.email};localStorage.pos=JSON.stringify(S)}
 async function api(path,opt={},retry=1){const r=await fetch(U+'/rest/v1/'+path,{...opt,headers:{apikey:K,Authorization:'Bearer '+S.t,'Content-Type':'application/json',...opt.headers}});if(r.status==401&&retry){await auth({refresh_token:S.r},'refresh_token');return api(path,opt,0)}const j=await r.json().catch(()=>null);if(!r.ok)throw new Error(j?.message||'Error');return j}
-async function load(){[prods,stock]=await Promise.all([api('pos_productos?select=*,pos_producto_componentes(stock_item_id,cantidad)&activo=eq.true&order=categoria,nombre'),api('pos_stock_items?select=*&activo=eq.true&order=nombre')])}
+async function load(){[all,stock]=await Promise.all([api('pos_productos?select=*,pos_producto_componentes(stock_item_id,cantidad)&order=categoria,nombre'),api('pos_stock_items?select=*&activo=eq.true&order=nombre')]);prods=all.filter(p=>p.activo)}
 function login(){app.innerHTML=`<header><b>POS Anabela</b></header><main><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Contraseña"><button class="go" onclick="doLogin()">Entrar</button><p id="er" style="color:#b00"></p></main>`}
 async function doLogin(){try{await auth({email:$('em').value.trim(),password:$('pw').value},'password');await start()}catch(e){$('er').textContent=e.message}}
 async function start(){try{await load();draw()}catch(e){out()}}
 function out(){localStorage.removeItem('pos');S=null;login()}
-function draw(){app.innerHTML=`<header><b>POS Anabela</b><small>${esc(S.e)} · <a href="#" onclick="out()" style="color:#fff">salir</a></small></header><nav><button class="${tab=='v'?'on':''}" onclick="tab='v';draw()">Vender</button><button class="${tab=='s'?'on':''}" onclick="tab='s';draw()">Stock</button></nav><main>${tab=='v'?vender():stockV()}</main>${tab=='v'&&cart.length?bar():''}`}
+function draw(){app.innerHTML=`<header><b>POS Anabela</b><small>${esc(S.e)} · <a href="#" onclick="out()" style="color:#fff">salir</a></small></header><nav><button class="${tab=='v'?'on':''}" onclick="tab='v';draw()">Vender</button><button class="${tab=='s'?'on':''}" onclick="tab='s';draw()">Stock</button><button class="${tab=='p'?'on':''}" onclick="tab='p';draw()">Productos</button></nav><main>${tab=='v'?vender():tab=='s'?stockV():prodV()}</main>${tab=='v'&&cart.length?bar():''}`}
 function vender(){let h='',c=null;for(const p of prods){if(p.categoria!==c){if(c!==null)h+='</div>';c=p.categoria;h+=`<div class="cat">${esc(c)}</div><div class="g">`}h+=`<button class="p" onclick="add('${p.id}')">${esc(p.nombre)}<small>${p.precio==null?'sin precio':$$(p.precio)}</small></button>`}return h+'</div>'}
 function add(id){const p=prods.find(x=>x.id==id),l=cart.find(x=>x.id==id);if(l){l.q+=st(p);return draw()}let pr=p.precio;if(pr==null){pr=parseFloat((prompt('Precio de "'+p.nombre+'"')||'').replace(',','.'));if(isNaN(pr))return}cart.push({id,q:st(p),pr});draw()}
 function qty(id,d){const l=cart.find(x=>x.id==id),p=prods.find(x=>x.id==id);l.q+=d*st(p);if(l.q<=0)cart=cart.filter(x=>x!=l);draw()}
@@ -43,5 +43,21 @@ const lineas=cart.map(l=>{const p=prods.find(x=>x.id==l.id);return{producto_id:p
 try{await api('rpc/pos_registrar_venta',{method:'POST',body:JSON.stringify({p:{canal:F.canal,tipo:cort?'cortesia':'venta',medio_pago:cort?null:F.pago,cliente_nombre:F.n.trim()||null,cliente_whatsapp:F.w.trim()||null,lineas}})});cart=[];cort=false;F.n=F.w='';await load();draw()}catch(e){$('er').textContent=e.message}}
 function stockV(){return stock.map(s=>`<div class="row"><span>${esc(s.nombre)}<br><b>${s.unidad=='g'?(s.stock/1000).toLocaleString('es-AR')+' kg':Number(s.stock)+' u'}</b></span><button class="pb" onclick="prod('${s.id}')">+ Producción</button></div>`).join('')}
 async function prod(id){const s=stock.find(x=>x.id==id);const v=parseFloat((prompt('¿Cuánto cocinaste de "'+s.nombre+'"? ('+(s.unidad=='g'?'kilos':'unidades')+')')||'').replace(',','.'));if(isNaN(v)||v<=0)return;try{await api('rpc/pos_cargar_produccion',{method:'POST',body:JSON.stringify({p_item:id,p_cantidad:s.unidad=='g'?v*1000:v})});await load();draw()}catch(e){alert(e.message)}}
+
+async function save(f){try{await f();await load();draw()}catch(e){alert(e.message)}}
+const num=t=>parseFloat(String(t).replace(',','.'));
+function prodV(){return `<button class="go" onclick="nuevo()">+ Nuevo producto</button>`+all.map(p=>`<div class="row" style="${p.activo?'':'opacity:.45'}"><span>${esc(p.nombre)}<br><small>${esc(p.categoria)} · ${p.precio==null?'sin precio':$$(p.precio)}${p.activo?'':' · oculto'}</small></span><button class="pb" onclick="editar('${p.id}')">Editar</button></div>`).join('')}
+async function editar(id){const p=all.find(x=>x.id==id);const n=prompt('Nombre',p.nombre);if(n===null)return;const pr=prompt('Precio (vacío = sin precio)',p.precio??'');if(pr===null)return;if(pr.trim()!==''&&isNaN(num(pr)))return alert('Precio inválido');
+const a=confirm(p.activo?'¿Dejarlo visible? (Cancelar = ocultarlo)':'¿Volver a mostrarlo? (Cancelar = sigue oculto)');
+save(()=>api('pos_productos?id=eq.'+id,{method:'PATCH',body:JSON.stringify({nombre:n.trim()||p.nombre,precio:pr.trim()===''?null:num(pr),activo:a})}))}
+async function nuevo(){const cats=[...new Set(all.map(p=>p.categoria))];const cat=cats[parseInt(prompt('Categoría (escribí el número):\n'+cats.map((c,i)=>(i+1)+'. '+c).join('\n')))-1];if(!cat)return;
+const n=(prompt('Nombre del producto')||'').trim();if(!n)return;const pr=(prompt('Precio (vacío = completar después)')||'').trim();if(pr&&isNaN(num(pr)))return alert('Precio inválido');
+const k=parseInt(prompt('¿De qué stock descuenta? (escribí el número)\n0. Sin control de stock\n'+stock.map((s,i)=>(i+1)+'. '+s.nombre).join('\n')+'\n'+(stock.length+1)+'. Un stock NUEVO (sabor nuevo)'));if(isNaN(k)||k<0||k>stock.length+1)return;
+let sid=k>=1&&k<=stock.length?stock[k-1].id:null,sn=null,u='u',cant=1;
+if(k==stock.length+1){sn=(prompt('Nombre del stock nuevo (ej: Ravioles de calabaza)',n)||'').trim();if(!sn)return;u=confirm('¿Se cuenta en unidades? (Aceptar = unidades, Cancelar = gramos)')?'u':'g'}
+if(sid||sn){cant=num(prompt('¿Cuánto descuenta cada vez que se vende?\\nEj: 18 una plancha, 12 una docena, 1 una unidad, 1000 un kilo (en gramos)','1'));if(isNaN(cant)||cant<=0)return}
+save(async()=>{if(sn){const r=await api('pos_stock_items',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({nombre:sn,unidad:u})});sid=r[0].id}
+const r=await api('pos_productos',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({nombre:n,categoria:cat,precio:pr===''?null:num(pr)})});
+if(sid)await api('pos_producto_componentes',{method:'POST',body:JSON.stringify({producto_id:r[0].id,stock_item_id:sid,cantidad:cant})})})}
 S?start():login();
 </script></body></html>
