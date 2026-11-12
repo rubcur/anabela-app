@@ -192,6 +192,7 @@
     border-top:2px solid var(--ink); font-family:'Space Mono',monospace; font-weight:700; font-size:15px;
   }
 
+  .sab{display:flex;flex-direction:column;gap:6px;margin:2px 0 12px}.sab select{width:100%;padding:8px;border:1px solid #d9ccb2;border-radius:8px;background:#fff;font:inherit}
   textarea#nota{
     width:100%; margin-top:12px; border:1px solid var(--linea); border-radius:6px; background:var(--paper);
     font-family:'Karla',sans-serif; font-size:13px; padding:8px; resize:vertical; min-height:44px;
@@ -432,7 +433,7 @@ async function cargarCatalogo(){
           const usaPrecioAlt = p.precio_alternativo != null && p.dias_precio_alternativo && p.dias_precio_alternativo.includes(diaHoy);
           const precioEfectivo = usaPrecioAlt ? p.precio_alternativo : p.precio;
           return {
-            nombre:p.nombre, desc:p.descripcion, precio:precioEfectivo,
+            nombre:p.nombre, desc:p.descripcion, precio:precioEfectivo, opciones:parseOpc(p.descripcion), picks:parsePicks(p.nombre),
             destacado:p.destacado, foto:p.foto_url,
             etiqueta: p.etiqueta || (esNuevoAuto ? "nuevo" : null),
             noEsHoy, diasTexto, precioEspecialHoy: usaPrecioAlt,
@@ -448,6 +449,11 @@ async function cargarCatalogo(){
 }
 
 let cart = {};
+function parseOpc(d){const m=(d||'').match(/^\s*A elecci[oó]n:\s*(.+)$/i);return m?m[1].split('/').map(x=>x.trim()).filter(Boolean):null}
+function parsePicks(n){const m=(n||'').match(/\((\d+|½)\s*(?:plancha|planchas|docena|docenas)\)/i);return m?(m[1]==='½'?1:parseInt(m[1],10)):1}
+function buscarItem(cat,nombre){const c=MENU.find(x=>x.cat===cat);return c&&c.items.find(i=>i.nombre===nombre)}
+function resumenSab(it){const c={};for(let i=0;i<it.cant*it.picks;i++){const s=it.sel[i];if(s)c[s]=(c[s]||0)+1}return c}
+function setSab(k,i,v){cart[k].sel[i]=v;renderComanda()}
 let metodoPago = "transferencia"; // arranca en transferencia, como antes
 
 function seleccionarMetodo(m){
@@ -574,7 +580,7 @@ function renderMenu(){
 }
 
 function cambiarCant(key, cat, nombre, precio, delta){
-  if(!cart[key]) cart[key] = {nombre, precio, cant:0};
+  if(!cart[key]){const m=buscarItem(cat,nombre);cart[key] = {nombre, precio, cant:0, opciones:(m&&m.opciones)||null, picks:(m&&m.picks)||1, sel:[]};}
   cart[key].cant += delta;
   if(cart[key].cant<=0) delete cart[key];
   renderMenu();
@@ -607,7 +613,7 @@ function renderComanda(){
       <span class="qty">x${it.cant}</span>
       <span>$${(it.precio*it.cant).toLocaleString('es-AR')}</span>
       <button class="rm" onclick="quitar('${k}')">✕</button>
-    </div>`;
+    </div>${it.opciones?`<div class="sab">${Array.from({length:it.cant*it.picks},(_,i)=>`<select onchange="setSab('${k}',${i},this.value)"><option value="">Elegí el sabor${it.cant*it.picks>1?' '+(i+1):''}…</option>${it.opciones.map(o=>`<option ${it.sel[i]===o?'selected':''}>${o}</option>`).join('')}</select>`).join('')}</div>`:''}`;
   }).join("");
 
   document.getElementById("totalNum").textContent = "$"+total.toLocaleString('es-AR');
@@ -632,6 +638,7 @@ function actualizarLinkWhatsapp(total){
     : "Hola! Quiero hacer este pedido a Anabela Cocina Casera:\n\n";
   Object.values(cart).forEach(it=>{
     texto += `• ${it.nombre} x${it.cant} — $${(it.precio*it.cant).toLocaleString('es-AR')}\n`;
+    if(it.opciones){const rs=resumenSab(it);const t=Object.keys(rs).map(x=>rs[x]+' × '+x).join(', ');if(t) texto += `   Sabores: ${t}\n`;}
   });
   texto += `\nTOTAL: $${total.toLocaleString('es-AR')}`;
   texto += `\nForma de pago: ${textoMetodo}`;
@@ -643,6 +650,8 @@ function actualizarLinkWhatsapp(total){
 document.getElementById("wspBtn").addEventListener("click", async function(e){
   e.preventDefault();
   if(this.classList.contains("disabled")) return;
+  const falta=Object.values(cart).find(it=>it.opciones&&Array.from({length:it.cant*it.picks},(_,i)=>it.sel[i]).some(x=>!x));
+  if(falta){alert('Elegí el sabor de: '+falta.nombre);return;}
 
   const telefono = obtenerTelefono();
   const nombreCliente = obtenerNombre();
@@ -676,8 +685,10 @@ document.getElementById("wspBtn").addEventListener("click", async function(e){
         cantidad: it.cant,
         precio_unitario: it.precio,
         subtotal: it.precio*it.cant,
+        sabores: it.opciones ? resumenSab(it) : null,
       }));
-      await sb.from("pedido_items").insert(items);
+      const { error: errItems } = await sb.from("pedido_items").insert(items);
+      if(errItems){ console.warn("pedido_items con sabores falló, reintento sin sabores:", errItems.message); await sb.from("pedido_items").insert(items.map(({sabores, ...resto}) => resto)); }
 
       // Cliente y puntos: no bloquean el envío del pedido por WhatsApp si fallan,
       // pero corren EN ORDEN (uno espera al otro) y cualquier error se ve en consola.
