@@ -27,7 +27,7 @@ function login(){app.innerHTML=`<header><b>POS Anabela</b></header><main><input 
 async function doLogin(){try{await auth({email:$('em').value.trim(),password:$('pw').value},'password');await start()}catch(e){$('er').textContent=e.message}}
 async function start(){try{await load();draw()}catch(e){out()}}
 function out(){localStorage.removeItem('pos');S=null;login()}
-function draw(){app.innerHTML=`<header><b>POS Anabela</b><small>${esc(S.e)} · <a href="#" onclick="out()" style="color:#fff">salir</a></small></header><nav><button class="${tab=='v'?'on':''}" onclick="tab='v';draw()">Vender</button><button class="${tab=='s'?'on':''}" onclick="tab='s';draw()">Stock</button><button class="${tab=='p'?'on':''}" onclick="tab='p';draw()">Productos</button></nav><main>${tab=='v'?vender():tab=='s'?stockV():prodV()}</main>${tab=='v'&&cart.length?bar():''}`}
+function draw(){app.innerHTML=`<header><b>POS Anabela</b><small>${esc(S.e)} · <a href="#" onclick="out()" style="color:#fff">salir</a></small></header><nav><button class="${tab=='v'?'on':''}" onclick="tab='v';draw()">Vender</button><button class="${tab=='s'?'on':''}" onclick="tab='s';draw()">Stock</button><button class="${tab=='p'?'on':''}" onclick="tab='p';draw()">Productos</button><button class="${tab=='c'?'on':''}" onclick="tab='c';cargarCaja()">Caja</button></nav><main>${tab=='v'?vender():tab=='s'?stockV():tab=='c'?cajaV():prodV()}</main>${tab=='v'&&cart.length?bar():''}`}
 function vender(){let h='',c=null;for(const p of prods){if(p.categoria!==c){if(c!==null)h+='</div>';c=p.categoria;h+=`<div class="cat">${esc(c)}</div><div class="g">`}h+=`<button class="p" onclick="add('${p.id}')">${esc(p.nombre)}<small>${p.precio==null?'sin precio':$$(p.precio)}</small></button>`}return h+'</div>'}
 function add(id){const p=prods.find(x=>x.id==id),l=cart.find(x=>x.id==id);if(l){l.q+=st(p);return draw()}let pr=p.precio;if(pr==null){pr=parseFloat((prompt('Precio de "'+p.nombre+'"')||'').replace(',','.'));if(isNaN(pr))return}cart.push({id,q:st(p),pr});draw()}
 function qty(id,d){const l=cart.find(x=>x.id==id),p=prods.find(x=>x.id==id);l.q+=d*st(p);if(l.q<=0)cart=cart.filter(x=>x!=l);draw()}
@@ -59,6 +59,30 @@ if(sid||sn){cant=num(prompt('¿Cuánto descuenta cada vez que se vende?\\nEj: 18
 save(async()=>{if(sn){const r=await api('pos_stock_items',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({nombre:sn,unidad:u})});sid=r[0].id}
 const r=await api('pos_productos',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({nombre:n,categoria:cat,precio:pr===''?null:num(pr)})});
 if(sid)await api('pos_producto_componentes',{method:'POST',body:JSON.stringify({producto_id:r[0].id,stock_item_id:sid,cantidad:cant})})})}
+let cajaP='hoy',caja=null,cajaErr='';
+function rango(p){const d=new Date();d.setHours(0,0,0,0);let a=new Date(d),b=new Date(d);b.setDate(b.getDate()+1);
+if(p=='ayer'){a.setDate(a.getDate()-1);b=new Date(d)}if(p=='semana')a.setDate(a.getDate()-(d.getDay()+6)%7);if(p=='mes')a.setDate(1);return[a.toISOString(),b.toISOString()]}
+const pl=s=>String(s||'').toLowerCase().replace(/\s/g,'');
+const PAGO={efectivo:'Efectivo',transferencia:'Transferencia',mercadopago:'Mercado Pago'};
+function agregar(v,ped,map){const r={tot:0,pos:0,app:0,nPos:0,nApp:0,cat:{},catApp:{},canal:{},pago:{},cort:{n:0,u:0,val:0}};
+const su=(o,k,x)=>{o[k]=(o[k]||0)+x};
+for(const x of v){const ls=x.pos_venta_lineas||[];
+if(x.tipo=='cortesia'){r.cort.n++;for(const l of ls){r.cort.u+=Number(l.cantidad);r.cort.val+=l.cantidad*((l.pos_productos&&l.pos_productos.precio)||0)}continue}
+const t=Number(x.total);r.pos+=t;r.nPos++;su(r.canal,x.canal,t);su(r.pago,PAGO[pl(x.medio_pago)]||x.medio_pago||'Sin dato',t);
+for(const l of ls)su(r.cat,(l.pos_productos&&l.pos_productos.categoria)||'Sin categoría',l.cantidad*l.precio_unit)}
+for(const p of ped){const t=Number(p.total);r.app+=t;r.nApp++;su(r.canal,'app',t);su(r.pago,PAGO[pl(p.forma_pago)]||p.forma_pago||'Sin dato',t);
+for(const i of (p.pedido_items||[]))su(r.catApp,map[i.nombre_producto]||'Sin categoría',Number(i.subtotal))}
+r.tot=r.pos+r.app;return r}
+async function cargarCaja(){caja=null;cajaErr='';draw();const[a,b]=rango(cajaP).map(encodeURIComponent);
+try{const v=await api(`pos_ventas?select=tipo,canal,medio_pago,total,pos_venta_lineas(cantidad,precio_unit,pos_productos(categoria,precio))&creada_en=gte.${a}&creada_en=lt.${b}`);
+let ped=[],map={};
+try{ped=await api(`pedidos?select=total,forma_pago,pedido_items(nombre_producto,subtotal)&estado=eq.entregado&creado_en=gte.${a}&creado_en=lt.${b}`);
+const pr=await api('productos?select=nombre,categorias(nombre)');pr.forEach(p=>{if(!map[p.nombre])map[p.nombre]=p.categorias&&p.categorias.nombre})}catch(e){cajaErr='No pude leer los pedidos de la app: '+e.message}
+caja=agregar(v,ped,map)}catch(e){cajaErr=e.message}draw()}
+const lista=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,x])=>`<div class="row"><span>${esc(k)}</span><b>${$$(x)}</b></div>`).join('')||'<small>Sin ventas</small>';
+function cajaV(){const ch=['hoy','ayer','semana','mes'].map(p=>`<button class="pb" style="${p==cajaP?'background:#c4452d;color:#fff':''}" onclick="cajaP='${p}';cargarCaja()">${p[0].toUpperCase()+p.slice(1)}</button>`).join(' ');
+const er=cajaErr?`<p style="color:#b00">${esc(cajaErr)}</p>`:'';if(!caja)return ch+er+(cajaErr?'':'<p>Cargando…</p>');const c=caja;
+return ch+er+`<h2 style="margin:14px 0 0">${$$(c.tot)}</h2><small>Total vendido · ${c.nPos} ventas de mostrador/WhatsApp y ${c.nApp} pedidos entregados de la app</small><div class="cat">Mostrador y WhatsApp · ${$$(c.pos)}</div>${lista(c.cat)}<div class="cat">App · ${$$(c.app)}</div>${lista(c.catApp)}<div class="cat">Por canal</div>${lista(c.canal)}<div class="cat">Por forma de pago</div>${lista(c.pago)}<div class="cat">Cortesías (no suman al total)</div><div class="row"><span>${c.cort.n} cortesías · ${c.cort.u} unidades</span><b>${$$(c.cort.val)}</b></div><small>Valor a precio de lista</small>`}
 function refrescar(){if(!S||document.hidden)return;load().then(()=>{const f=document.activeElement;if(!cart.length&&!(f&&/INPUT|SELECT|TEXTAREA/.test(f.tagName)))draw()}).catch(()=>{})}
 setInterval(refrescar,20000);document.addEventListener('visibilitychange',refrescar);
 S?start():login();
