@@ -41,7 +41,12 @@ function bar(){const t=cart.reduce((a,l)=>a+l.q*l.pr,0);return `<div class="bar"
 async function cobrar(){if(cort&&(!F.n.trim()||!F.w.trim()))return $('er').textContent='Para la cortesía cargá nombre y WhatsApp';
 const lineas=cart.map(l=>{const p=prods.find(x=>x.id==l.id);return{producto_id:p.id,descripcion:p.nombre,cantidad:l.q,precio_unit:l.pr,consumos:p.pos_producto_componentes.map(c=>({stock_item_id:c.stock_item_id,cantidad:c.cantidad*l.q}))}});
 try{await api('rpc/pos_registrar_venta',{method:'POST',body:JSON.stringify({p:{canal:F.canal,tipo:cort?'cortesia':'venta',medio_pago:cort?null:F.pago,cliente_nombre:F.n.trim()||null,cliente_whatsapp:F.w.trim()||null,lineas}})});cart=[];cort=false;F.n=F.w='';await load();draw()}catch(e){$('er').textContent=e.message}}
-function stockV(){return stock.map(s=>`<div class="row"><span>${esc(s.nombre)}<br><b>${s.unidad=='g'?(s.stock/1000).toLocaleString('es-AR')+' kg':Number(s.stock)+' u'}</b></span><button class="pb" onclick="prod('${s.id}')">+ Producción</button></div>`).join('')}
+function stockV(){return stock.map(s=>`<div class="row"><span>${esc(s.nombre)}<br><b>${s.unidad=='g'?(s.stock/1000).toLocaleString('es-AR')+' kg':Number(s.stock)+' u'}</b></span><span style="display:flex;gap:6px"><button class="pb" onclick="ajustar('${s.id}')">Ajustar</button><button class="pb" onclick="prod('${s.id}')">+ Producción</button></span></div>`).join('')}
+async function ajustar(id){const s=stock.find(x=>x.id==id);const k=['Consumo propio','Merma','Regalo','Plato del día'];
+const v=num(prompt('¿Cuánto descontar de "'+s.nombre+'"? ('+(s.unidad=='g'?'kilos':'unidades')+')'));if(isNaN(v)||v<=0)return;
+const m=prompt('Motivo (escribí el número o el texto):\n'+k.map((x,i)=>(i+1)+'. '+x).join('\n'),'1');if(m===null)return;
+const mot=k[parseInt(m)-1]||m.trim()||'Ajuste';
+save(()=>api('rpc/pos_ajustar_stock',{method:'POST',body:JSON.stringify({p_item:id,p_cantidad:-(s.unidad=='g'?v*1000:v),p_nota:mot})}))}
 async function prod(id){const s=stock.find(x=>x.id==id);const v=parseFloat((prompt('¿Cuánto cocinaste de "'+s.nombre+'"? ('+(s.unidad=='g'?'kilos':'unidades')+')')||'').replace(',','.'));if(isNaN(v)||v<=0)return;try{await api('rpc/pos_cargar_produccion',{method:'POST',body:JSON.stringify({p_item:id,p_cantidad:s.unidad=='g'?v*1000:v})});await load();draw()}catch(e){alert(e.message)}}
 
 async function save(f){try{await f();await load();draw()}catch(e){alert(e.message)}}
